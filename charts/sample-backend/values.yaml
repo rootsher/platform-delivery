@@ -1,0 +1,42 @@
+image:
+  repository: ghcr.io/rootsher/platform-sample-backend
+  # Always a digest. Promotion between environments is a change of this value
+  # and nothing else, so a tag that can move under us has no place here.
+  digest: ""
+
+replicas: 2
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+logLevel: info
+
+# Seconds the pod keeps serving after it is marked for deletion, so that
+# endpoints and load balancers stop sending traffic before SIGTERM arrives.
+drainDelaySeconds: 5
+
+database:
+  instances: 2
+  storage: 1Gi
+  storageClass: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+migrations:
+  backoffLimit: 6
+
+route:
+  enabled: false
+  gateway:
+    name: ""
+    namespace: ""
+    sectionName: ""
+  hostnames: []

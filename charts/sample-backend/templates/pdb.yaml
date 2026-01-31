@@ -1,0 +1,14 @@
+{{- if gt (int .Values.replicas) 1 }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "sample-backend.name" . }}
+  labels:
+    {{- include "sample-backend.labels" . | nindent 4 }}
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      {{- include "sample-backend.selector" . | nindent 6 }}
+      app.kubernetes.io/component: api
+{{- end }}

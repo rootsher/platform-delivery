@@ -1,0 +1,24 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ include "sample-backend.database" . }}
+  labels:
+    {{- include "sample-backend.labels" . | nindent 4 }}
+  annotations:
+    # The database has to exist before the migration job can run against it.
+    argocd.argoproj.io/sync-wave: "-1"
+    # Missing CRDs on the first sync are expected while the operator installs.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  instances: {{ .Values.database.instances }}
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+  storage:
+    size: {{ .Values.database.storage }}
+    {{- with .Values.database.storageClass }}
+    storageClass: {{ . }}
+    {{- end }}
+  resources:
+    {{- toYaml .Values.database.resources | nindent 4 }}
