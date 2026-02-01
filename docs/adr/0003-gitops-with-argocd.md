@@ -15,9 +15,13 @@ Application per environment from a single template.
 ## Decision
 
 ArgoCD is installed once per cluster by the bootstrap step and then manages
-itself and everything else. A single ApplicationSet uses a git directory
-generator over `environments/*`: each directory becomes an environment, and the
-chart templates are shared. Environments differ only in values.
+itself and everything else. Each cluster is one environment. Its ApplicationSet
+uses a git directory generator over `environments/<env>/*`: every directory
+there is one workload, named after its chart, holding only that workload's
+values. The chart templates are shared, so environments differ only in values.
+
+There is no central ArgoCD managing all clusters. A hub would save a few
+installs but would make the local cluster work differently from the rest.
 
 The image is referenced by digest, never by tag. Promotion is a change of that
 digest in an environment's values.
