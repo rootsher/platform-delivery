@@ -1,0 +1,21 @@
+# Used twice: by `make up` for the first install, and by the argocd
+# Application afterwards, when ArgoCD takes over managing itself. Keeping one
+# file means the handover does not change anything.
+global:
+  domain: argocd.localhost
+
+configs:
+  params:
+    # TLS ends at the Gateway, not in the ArgoCD server.
+    server.insecure: true
+  cm:
+    # Resources are tracked by annotation, so copies made by operators (the
+    # Secrets CloudNativePG writes, for example) are not mistaken for ours.
+    application.resourceTrackingMethod: annotation
+    timeout.reconciliation: 60s
+
+dex:
+  enabled: false
+
+notifications:
+  enabled: false
