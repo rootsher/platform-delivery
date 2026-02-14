@@ -22,6 +22,25 @@ docs/adr/        decisions and the reasons behind them
 
 An environment is a directory. Adding one means adding values, not templates.
 
+## Running it locally
+
+Needs Docker, kind, kubectl, helm and jq, and about 6 GB of free memory.
+
+```sh
+make up        # cluster, ArgoCD, then everything else through GitOps
+make password  # admin password for the ArgoCD UI
+make down
+```
+
+`make up` only installs ArgoCD and applies `clusters/local/root.yaml`. From
+there ArgoCD takes over managing itself, installs the operators and syncs the
+workloads from `environments/local`. The last step is a smoke test that writes
+a note through the API and reads it back.
+
+ArgoCD reads this repo from GitHub, not from the working copy, so local changes
+have to be pushed before the cluster sees them. While the repo is private, pass
+a token that can read it: `make up REPO_TOKEN=$(gh auth token)`.
+
 ## Decisions
 
 The reasoning is in [docs/adr](docs/adr). The short version:
