@@ -1,0 +1,21 @@
+image:
+  digest: sha256:856462fff1236f2073d1cacbd4f79f260471af51de5704b985551203de69d6f6
+
+replicas: 2
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 96Mi
+  limits:
+    memory: 192Mi
+
+database:
+  instances: 2
+  storage: 512Mi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 192Mi
+    limits:
+      memory: 384Mi
