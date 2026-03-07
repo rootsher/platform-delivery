@@ -25,6 +25,8 @@ argocd:
 		--namespace argocd --create-namespace \
 		--values bootstrap/argocd/values.yaml \
 		--wait --timeout 10m
+	@# Lets the ArgoCD UI attach its route to the platform Gateway.
+	@$(KUBECTL) label namespace argocd platform.rootsher.dev/tier=platform --overwrite
 
 repo-creds:
 ifneq ($(REPO_TOKEN),)

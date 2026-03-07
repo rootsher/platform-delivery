@@ -19,3 +19,10 @@ database:
       memory: 192Mi
     limits:
       memory: 384Mi
+
+route:
+  enabled: true
+  gateway:
+    name: public
+    namespace: gateway
+  hostnames: [notes.localhost]

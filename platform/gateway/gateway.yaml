@@ -1,0 +1,22 @@
+# Owned by the platform. Workloads attach HTTPRoutes to it, but only from
+# namespaces marked as workload namespaces, so a route cannot appear from
+# anywhere else in the cluster.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: public
+  namespace: gateway
+spec:
+  gatewayClassName: envoy
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchExpressions:
+              - key: platform.rootsher.dev/tier
+                operator: In
+                values: [workload, platform]

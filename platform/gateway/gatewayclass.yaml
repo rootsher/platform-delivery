@@ -1,0 +1,14 @@
+# The class points at an EnvoyProxy named "proxy" in the gateway namespace.
+# Each cluster defines that object itself: a NodePort locally, a load balancer
+# in the cloud. Everything above it is the same everywhere.
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: envoy
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  parametersRef:
+    group: gateway.envoyproxy.io
+    kind: EnvoyProxy
+    name: proxy
+    namespace: gateway

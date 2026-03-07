@@ -37,6 +37,9 @@ spec:
           selfHeal: true
         syncOptions:
           - CreateNamespace=true
+        managedNamespaceMetadata:
+          labels:
+            platform.rootsher.dev/tier: workload
         # The first sync can land before the operator's CRDs are ready.
         retry:
           limit: 10

@@ -35,7 +35,10 @@ make down
 `make up` only installs ArgoCD and applies `clusters/local/root.yaml`. From
 there ArgoCD takes over managing itself, installs the operators and syncs the
 workloads from `environments/local`. The last step is a smoke test that writes
-a note through the API and reads it back.
+a note through the Gateway and reads it back.
+
+Once it is up, http://notes.localhost:8080/api/notes is the service and
+http://argocd.localhost:8080 is ArgoCD.
 
 ArgoCD reads this repo from GitHub, not from the working copy, so local changes
 have to be pushed before the cluster sees them. While the repo is private, pass
