@@ -1,0 +1,38 @@
+# The local stand in for AWS Secrets Manager. Dev mode keeps everything in
+# memory, which is fine for a cluster that is thrown away with `make down`.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openbao
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  project: default
+  source:
+    repoURL: https://openbao.github.io/openbao-helm
+    chart: openbao
+    targetRevision: 0.29.6
+    helm:
+      releaseName: openbao
+      valuesObject:
+        injector:
+          enabled: false
+        server:
+          dev:
+            enabled: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openbao
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
