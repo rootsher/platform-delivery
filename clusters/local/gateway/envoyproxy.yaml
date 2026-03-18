@@ -1,5 +1,7 @@
 # kind has no load balancer, so the proxy is exposed on a fixed NodePort that
-# clusters/local/kind.yaml maps to port 8080 on the host.
+# clusters/local/kind.yaml maps to port 8080 on the host. Only the control
+# plane node has that mapping and the proxy runs on a worker, so traffic has to
+# be allowed to hop between nodes; Envoy Gateway defaults to Local.
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: EnvoyProxy
 metadata:
@@ -11,6 +13,7 @@ spec:
     kubernetes:
       envoyService:
         type: NodePort
+        externalTrafficPolicy: Cluster
         patch:
           type: StrategicMerge
           value:
