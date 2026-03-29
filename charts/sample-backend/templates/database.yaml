@@ -10,6 +10,7 @@ metadata:
     # Missing CRDs on the first sync are expected while the operator installs.
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
+  imageName: {{ required "database.image is required" .Values.database.image }}
   instances: {{ .Values.database.instances }}
   bootstrap:
     initdb:
