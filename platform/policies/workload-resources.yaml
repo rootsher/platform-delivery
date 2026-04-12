@@ -1,0 +1,36 @@
+# Requests are what the scheduler plans with and a memory limit is what keeps
+# one pod from taking a node down. CPU limits are left out on purpose: they
+# throttle a pod even when the node has idle CPU.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: workload-resources
+spec:
+  validationActions: [Deny]
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        platform.rootsher.dev/tier: workload
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  variables:
+    - name: containers
+      expression: object.spec.containers + object.spec.?initContainers.orValue([])
+  validations:
+    - expression: >-
+        variables.containers.all(c,
+          has(c.resources) &&
+          c.resources.?requests.?cpu.hasValue() &&
+          c.resources.?requests.?memory.hasValue() &&
+          c.resources.?limits.?memory.hasValue())
+      messageExpression: >-
+        'every container needs cpu and memory requests and a memory limit, missing on: '
+        + variables.containers.filter(c, !(
+            has(c.resources) &&
+            c.resources.?requests.?cpu.hasValue() &&
+            c.resources.?requests.?memory.hasValue() &&
+            c.resources.?limits.?memory.hasValue())).map(c, c.name).join(', ')

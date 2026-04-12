@@ -55,3 +55,5 @@ The reasoning is in [docs/adr](docs/adr). The short version:
 - AWS is described in Terraform and checked without an account. Nothing is
   actually provisioned; the working end to end flow is the local one.
 - Schema changes are expand then contract, so a rollback is a digest revert.
+- Pod Security Admission at restricted plus Kyverno in Enforce mode everywhere:
+  signed images by digest, known registries, requests and limits.

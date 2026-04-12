@@ -1,0 +1,23 @@
+# Pod security itself is enforced by the built in Pod Security Admission at the
+# restricted level. This keeps anyone from quietly relaxing it: a workload
+# namespace without the restricted label is not accepted.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: workload-namespaces
+spec:
+  validationActions: [Deny]
+  failurePolicy: Fail
+  matchConstraints:
+    objectSelector:
+      matchLabels:
+        platform.rootsher.dev/tier: workload
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [namespaces]
+  validations:
+    - expression: >-
+        object.metadata.?labels[?'pod-security.kubernetes.io/enforce'].orValue('') == 'restricted'
+      message: workload namespaces must enforce the restricted pod security level
