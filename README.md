@@ -10,13 +10,126 @@ GitOps flow, the same database operator and the same policies as the cloud
 environments. It has fewer replicas and less memory. It does not have fewer
 rules.
 
+## Flow
+
+From a push in the service repo to a request served in a cluster. Solid lines
+exist today; dashed lines are the promotion path that is still being built.
+
+```mermaid
+flowchart LR
+  subgraph backend["platform-sample-backend CI"]
+    direction TB
+    push["push to main"] --> checks["lint, type check,<br/>tests on Postgres"]
+    push --> scans["gitleaks, Semgrep"]
+    checks --> build["image build<br/>(distroless, non-root)"]
+    scans --> build
+    build --> sbom["Syft SBOM"] --> grype["Grype scan"]
+    grype --> publish["push to GHCR"]
+    publish --> sign["cosign sign,<br/>SBOM and SLSA attestations"]
+  end
+
+  publish --> ghcr[("GHCR<br/>image by digest")]
+  sign --> rekor[("Rekor<br/>transparency log")]
+
+  subgraph repo["platform-delivery"]
+    direction TB
+    local["environments/local"]
+    staging["environments/staging"]
+    prod["environments/prod"]
+  end
+
+  sign -. "PR with the new digest" .-> staging
+  staging -. "manual promotion PR" .-> prod
+
+  subgraph cluster["cluster"]
+    direction TB
+    argocd["ArgoCD<br/>ApplicationSet"] --> admission{"admission:<br/>Pod Security restricted,<br/>Kyverno"}
+    admission --> db["CloudNativePG cluster"] --> migrate["migration job"] --> api["API pods"]
+    api --> gateway["Envoy Gateway"]
+  end
+
+  local --> argocd
+  staging -.-> argocd
+  prod -.-> argocd
+  admission -- "signature and SBOM" --> rekor
+  admission -- "pull by digest" --> ghcr
+  gateway --> client(("client"))
+```
+
+The digest is the only thing that moves between environments. It is written
+once by CI, checked at admission against the signature CI made, and a rollback
+is a revert of the commit that changed it ([ADR 8](docs/adr/0008-rollback-by-digest.md)).
+
+### Inside a cluster
+
+`make up` does the first two steps by hand. Everything after that is ArgoCD
+syncing this repo, in waves, each one waiting for the previous one to be
+healthy.
+
+```mermaid
+flowchart TB
+  kind["kind cluster"] --> install["helm install ArgoCD"] --> root["apply clusters/local/root.yaml"]
+  root --> w2
+
+  subgraph w2["wave -2: operators and CRDs"]
+    eg["Envoy Gateway<br/>(Gateway API CRDs)"]
+    kyverno["Kyverno"]
+    eso["external-secrets"]
+    bao["OpenBao"]
+  end
+
+  w2 --> w1
+
+  subgraph w1["wave -1: platform configuration"]
+    gw["GatewayClass, Gateway"]
+    pol["admission policies"]
+    store["ClusterSecretStore,<br/>OpenBao Kubernetes auth"]
+    cnpg["CloudNativePG operator"]
+  end
+
+  w1 --> w0
+
+  subgraph w0["wave 0: ArgoCD and workloads"]
+    self["ArgoCD manages itself"]
+    appset["workloads ApplicationSet"]
+  end
+
+  appset --> app
+
+  subgraph app["one Application per workload"]
+    direction LR
+    cluster["wave -1<br/>Postgres cluster"] --> job["wave 0<br/>migration job"] --> deploy["wave 1<br/>Deployment, Service,<br/>HTTPRoute"]
+  end
+```
+
+## Stack
+
+| Layer | Tool | Role |
+| --- | --- | --- |
+| Local cluster | kind, Kubernetes 1.35 | one control plane and two workers, so spreading and failover are real |
+| Packaging | Helm | one chart per workload; environments only supply values |
+| GitOps | ArgoCD with ApplicationSet | app of apps from `clusters/<env>/root.yaml`; ArgoCD also manages itself |
+| Database | CloudNativePG, Postgres 18 | a two instance cluster per workload; the operator writes the credentials Secret |
+| Migrations | a Job from the release image | runs between the database and the new pods, from the same digest |
+| Traffic | Gateway API, Envoy Gateway | the platform owns the Gateway, workloads own their HTTPRoutes |
+| Secrets | external-secrets, OpenBao locally | Kubernetes auth into OpenBao; AWS Secrets Manager through Pod Identity in the cloud |
+| Pod security | Pod Security Admission | restricted level on every workload namespace |
+| Admission policies | Kyverno, CEL policy types | signed images, SBOM attestation, known registries, digests, requests and limits |
+| Supply chain | cosign keyless, Rekor | signatures and attestations made in CI, verified again at admission |
+
+Not built yet: the staging and prod environments, promotion between them,
+Terraform for AWS (VPC, EKS, IAM, Pod Identity, ECR, Route 53) checked without
+an account, and observability (Prometheus, Loki, Tempo, OpenTelemetry).
+
 ## Layout
 
 ```
 bootstrap/       what has to exist before ArgoCD can manage the rest
 charts/          Helm charts for the workloads
+clusters/        per cluster: kind config, root app, what differs from others
 environments/    one directory per environment, only values live here
-clusters/        cluster definitions (kind locally)
+platform/        manifests shared by every cluster (gateway, policies)
+scripts/         the smoke test
 docs/adr/        decisions and the reasons behind them
 ```
 
