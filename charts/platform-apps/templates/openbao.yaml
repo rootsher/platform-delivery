@@ -1,3 +1,4 @@
+{{- if .Values.components.openbao.enabled }}
 # The local stand in for AWS Secrets Manager. Dev mode keeps everything in
 # memory, which is fine for a cluster that is thrown away with `make down`.
 apiVersion: argoproj.io/v1alpha1
@@ -12,7 +13,7 @@ spec:
   source:
     repoURL: https://openbao.github.io/openbao-helm
     chart: openbao
-    targetRevision: 0.29.6
+    targetRevision: 0.27.2
     helm:
       releaseName: openbao
       valuesObject:
@@ -36,3 +37,4 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+{{- end }}

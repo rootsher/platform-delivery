@@ -13,6 +13,10 @@ spec:
     targetRevision: 3.9.1
     helm:
       releaseName: kyverno
+      {{- with .Values.components.kyverno }}
+      valuesObject:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
   destination:
     server: https://kubernetes.default.svc
     namespace: kyverno

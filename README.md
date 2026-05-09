@@ -125,8 +125,8 @@ an account, and observability (Prometheus, Loki, Tempo, OpenTelemetry).
 
 ```
 bootstrap/       what has to exist before ArgoCD can manage the rest
-charts/          Helm charts for the workloads
-clusters/        per cluster: kind config, root app, what differs from others
+charts/          Helm charts: the workloads, and platform-apps with one cluster's Applications
+clusters/        per cluster: root app, its values, and what differs from others
 environments/    one directory per environment, only values live here
 platform/        manifests shared by every cluster (gateway, policies)
 scripts/         the smoke test

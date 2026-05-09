@@ -8,12 +8,12 @@ metadata:
 spec:
   project: default
   sources:
-    - repoURL: https://github.com/rootsher/platform-delivery.git
-      targetRevision: main
+    - repoURL: {{ $.Values.repoURL }}
+      targetRevision: {{ $.Values.revision }}
       path: platform/gateway
-    - repoURL: https://github.com/rootsher/platform-delivery.git
-      targetRevision: main
-      path: clusters/local/gateway
+    - repoURL: {{ $.Values.repoURL }}
+      targetRevision: {{ $.Values.revision }}
+      path: clusters/{{ $.Values.cluster }}/gateway
   destination:
     server: https://kubernetes.default.svc
     namespace: gateway

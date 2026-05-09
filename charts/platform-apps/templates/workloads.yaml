@@ -1,6 +1,9 @@
-# One Application per directory in environments/local. The directory name is
-# both the chart and the namespace, and the values in it are the only thing
-# that differs from another environment.
+{{- /*
+One Application per directory in environments/<cluster>. The directory name is
+both the chart and the namespace, and the values in it are the only thing that
+differs from another environment. The inner {{ }} belong to the ApplicationSet,
+so they are escaped from Helm.
+*/ -}}
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -11,26 +14,26 @@ spec:
   goTemplateOptions: ["missingkey=error"]
   generators:
     - git:
-        repoURL: https://github.com/rootsher/platform-delivery.git
-        revision: main
+        repoURL: {{ $.Values.repoURL }}
+        revision: {{ $.Values.revision }}
         directories:
-          - path: environments/local/*
+          - path: environments/{{ $.Values.cluster }}/*
   template:
     metadata:
-      name: 'local-{{ .path.basename }}'
+      name: '{{ $.Values.cluster }}-{{ "{{ .path.basename }}" }}'
     spec:
       project: default
       source:
-        repoURL: https://github.com/rootsher/platform-delivery.git
-        targetRevision: main
-        path: 'charts/{{ .path.basename }}'
+        repoURL: {{ $.Values.repoURL }}
+        targetRevision: {{ $.Values.revision }}
+        path: 'charts/{{ "{{ .path.basename }}" }}'
         helm:
-          releaseName: '{{ .path.basename }}'
+          releaseName: '{{ "{{ .path.basename }}" }}'
           valueFiles:
-            - '../../{{ .path.path }}/values.yaml'
+            - '../../{{ "{{ .path.path }}" }}/values.yaml'
       destination:
         server: https://kubernetes.default.svc
-        namespace: '{{ .path.basename }}'
+        namespace: '{{ "{{ .path.basename }}" }}'
       syncPolicy:
         automated:
           prune: true

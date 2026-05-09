@@ -1,5 +1,5 @@
-# The only object applied by hand. Everything else in the cluster is reached
-# from here.
+# The only object applied by hand. It renders charts/platform-apps with this
+# cluster's values, and everything else in the cluster is reached from there.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -12,7 +12,10 @@ spec:
   source:
     repoURL: https://github.com/rootsher/platform-delivery.git
     targetRevision: main
-    path: clusters/local/apps
+    path: charts/platform-apps
+    helm:
+      valueFiles:
+        - ../../clusters/local/platform.yaml
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd

@@ -4,7 +4,7 @@ KUBECTL := kubectl --context $(CONTEXT)
 
 # The bootstrap install and the Application that later manages ArgoCD must use
 # the same chart version, so it is read from the Application, not repeated.
-ARGOCD_CHART := $(shell awk '/chart: argo-cd/ { getline; print $$2 }' clusters/local/apps/argocd.yaml)
+ARGOCD_CHART := $(shell awk '/chart: argo-cd/ { getline; print $$2 }' charts/platform-apps/templates/argocd.yaml)
 
 # Only needed while the repo is private. ArgoCD reads this repo from GitHub,
 # not from the working copy, so it has to be able to authenticate.

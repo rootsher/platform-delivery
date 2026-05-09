@@ -8,13 +8,17 @@ spec:
   sources:
     - repoURL: https://argoproj.github.io/argo-helm
       chart: argo-cd
-      targetRevision: 10.9.2
+      targetRevision: 9.5.13
       helm:
         releaseName: argocd
         valueFiles:
           - $repo/bootstrap/argocd/values.yaml
-    - repoURL: https://github.com/rootsher/platform-delivery.git
-      targetRevision: main
+        {{- with .Values.components.argocd }}
+        valuesObject:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+    - repoURL: {{ $.Values.repoURL }}
+      targetRevision: {{ $.Values.revision }}
       ref: repo
   destination:
     server: https://kubernetes.default.svc

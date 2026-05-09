@@ -1,0 +1,5 @@
+apiVersion: v2
+name: platform-apps
+description: The ArgoCD Applications that make up one cluster. Rendered by the root app with that cluster's values.
+type: application
+version: 0.1.0

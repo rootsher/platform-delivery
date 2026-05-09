@@ -9,8 +9,8 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/rootsher/platform-delivery.git
-    targetRevision: main
+    repoURL: {{ $.Values.repoURL }}
+    targetRevision: {{ $.Values.revision }}
     path: platform/policies
   destination:
     server: https://kubernetes.default.svc

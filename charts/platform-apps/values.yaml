@@ -1,0 +1,18 @@
+# Name of the cluster, which is also the environment: selects
+# clusters/<cluster>/ and environments/<cluster>/.
+cluster: ""
+
+repoURL: https://github.com/rootsher/platform-delivery.git
+revision: main
+
+# Extra Helm values per component, merged over the defaults in the templates.
+# Sizes belong here; anything that is not a size needs a reason in an ADR.
+components:
+  argocd: {}
+  cloudnativePg: {}
+  envoyGateway: {}
+  externalSecrets: {}
+  kyverno: {}
+  openbao:
+    # Only the local cluster runs its own secret store.
+    enabled: false

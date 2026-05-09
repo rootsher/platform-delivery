@@ -1,0 +1,5 @@
+cluster: local
+
+components:
+  openbao:
+    enabled: true
