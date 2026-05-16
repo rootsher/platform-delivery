@@ -7,13 +7,11 @@ metadata:
     argocd.argoproj.io/sync-wave: "-1"
 spec:
   project: default
-  sources:
-    - repoURL: {{ $.Values.repoURL }}
-      targetRevision: {{ $.Values.revision }}
-      path: platform/gateway
-    - repoURL: {{ $.Values.repoURL }}
-      targetRevision: {{ $.Values.revision }}
-      path: clusters/{{ $.Values.cluster }}/gateway
+  # A kustomization over platform/gateway, adding what differs per cluster.
+  source:
+    repoURL: {{ $.Values.repoURL }}
+    targetRevision: {{ $.Values.revision }}
+    path: clusters/{{ $.Values.cluster }}/gateway
   destination:
     server: https://kubernetes.default.svc
     namespace: gateway
