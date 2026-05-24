@@ -1,0 +1,19 @@
+# Written by the promotion workflow in platform-sample-backend after every
+# green build on main. Do not edit by hand.
+image:
+  digest: sha256:856462fff1236f2073d1cacbd4f79f260471af51de5704b985551203de69d6f6
+
+replicas: 2
+
+database:
+  instances: 2
+  storage: 10Gi
+  storageClass: gp3
+
+route:
+  enabled: true
+  gateway:
+    name: public
+    namespace: gateway
+    sectionName: https
+  hostnames: [notes.staging.rootsher.dev]

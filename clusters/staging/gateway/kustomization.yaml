@@ -1,0 +1,33 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../../platform/gateway
+  - envoyproxy.yaml
+  - tls.yaml
+  - redirect.yaml
+  - argocd-route.yaml
+patches:
+  # TLS ends at the Gateway. The certificate comes from Secrets Manager
+  # through external-secrets, like any other secret.
+  - target:
+      kind: Gateway
+      name: public
+    patch: |-
+      - op: add
+        path: /spec/listeners/-
+        value:
+          name: https
+          protocol: HTTPS
+          port: 443
+          tls:
+            mode: Terminate
+            certificateRefs:
+              - name: public-tls
+          allowedRoutes:
+            namespaces:
+              from: Selector
+              selector:
+                matchExpressions:
+                  - key: platform.rootsher.dev/tier
+                    operator: In
+                    values: [workload, platform]

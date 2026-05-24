@@ -1,0 +1,9 @@
+cluster: prod
+
+components:
+  argocd:
+    global:
+      domain: argocd.rootsher.dev
+  kyverno:
+    admissionController:
+      replicas: 3

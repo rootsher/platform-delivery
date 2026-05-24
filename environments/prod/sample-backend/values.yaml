@@ -1,0 +1,32 @@
+# Changed only by the promote workflow in this repo, which copies the digest
+# that is currently in staging and opens a pull request for review.
+image:
+  digest: sha256:856462fff1236f2073d1cacbd4f79f260471af51de5704b985551203de69d6f6
+
+replicas: 3
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+
+database:
+  instances: 3
+  storage: 50Gi
+  storageClass: gp3
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      memory: 2Gi
+
+route:
+  enabled: true
+  gateway:
+    name: public
+    namespace: gateway
+    sectionName: https
+  hostnames: [notes.rootsher.dev]

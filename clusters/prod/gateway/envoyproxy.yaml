@@ -1,0 +1,31 @@
+# A network load balancer in front of the proxies. It only passes TCP through;
+# TLS is terminated by Envoy, so the certificate is managed in one place.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: proxy
+  namespace: gateway
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyService:
+        type: LoadBalancer
+        # Keeps the client address; the load balancer only targets nodes that
+        # run a proxy.
+        externalTrafficPolicy: Local
+        annotations:
+          service.beta.kubernetes.io/aws-load-balancer-type: external
+          service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+          service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+      envoyDeployment:
+        replicas: 3
+        container:
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+      envoyPDB:
+        minAvailable: 1

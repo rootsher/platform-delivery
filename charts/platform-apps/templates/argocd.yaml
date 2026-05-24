@@ -29,3 +29,8 @@ spec:
       selfHeal: true
     syncOptions:
       - ServerSideApply=true
+      - CreateNamespace=true
+    # Lets the ArgoCD UI attach its route to the platform Gateway.
+    managedNamespaceMetadata:
+      labels:
+        platform.rootsher.dev/tier: platform

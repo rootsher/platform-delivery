@@ -1,0 +1,25 @@
+# The only object applied by hand. It renders charts/platform-apps with this
+# cluster's values, and everything else in the cluster is reached from there.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/rootsher/platform-delivery.git
+    targetRevision: main
+    path: charts/platform-apps
+    helm:
+      valueFiles:
+        - ../../clusters/prod/platform.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

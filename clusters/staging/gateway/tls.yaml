@@ -1,0 +1,23 @@
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: public-tls
+  namespace: gateway
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: platform
+  target:
+    name: public-tls
+    template:
+      type: kubernetes.io/tls
+  data:
+    - secretKey: tls.crt
+      remoteRef:
+        key: staging/gateway/public-tls
+        property: certificate
+    - secretKey: tls.key
+      remoteRef:
+        key: staging/gateway/public-tls
+        property: private_key

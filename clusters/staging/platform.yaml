@@ -1,0 +1,9 @@
+cluster: staging
+
+components:
+  argocd:
+    global:
+      domain: argocd.staging.rootsher.dev
+  kyverno:
+    admissionController:
+      replicas: 2
