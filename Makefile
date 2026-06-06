@@ -10,7 +10,7 @@ ARGOCD_CHART := $(shell awk '/chart: argo-cd/ { getline; print $$2 }' charts/pla
 # not from the working copy, so it has to be able to authenticate.
 REPO_TOKEN ?=
 
-.PHONY: up down cluster argocd repo-creds root wait smoke password
+.PHONY: up down cluster argocd repo-creds root wait smoke password check
 
 up: cluster argocd repo-creds root wait smoke
 
@@ -57,6 +57,11 @@ smoke:
 password:
 	@$(KUBECTL) -n argocd get secret argocd-initial-admin-secret \
 		-o jsonpath='{.data.password}' | base64 -d; echo
+
+# The same checks CI runs on every pull request.
+check:
+	@scripts/check.sh
+	@scripts/check-parity.sh
 
 down:
 	kind delete cluster --name $(CLUSTER)
