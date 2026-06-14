@@ -170,3 +170,5 @@ The reasoning is in [docs/adr](docs/adr). The short version:
 - Schema changes are expand then contract, so a rollback is a digest revert.
 - Pod Security Admission at restricted plus Kyverno in Enforce mode everywhere:
   signed images by digest, known registries, requests and limits.
+- Staging follows main through automatic pull requests; prod gets the digest
+  staging already runs, through a reviewed pull request.

@@ -1,0 +1,72 @@
+# Promotion to prod is a pull request, never a push. This copies the digest
+# that is running in staging into prod and opens the PR; CODEOWNERS makes it
+# wait for a review. Rolling back is reverting that PR.
+name: promote
+
+on:
+  workflow_dispatch:
+    inputs:
+      workload:
+        description: Workload to promote from staging to prod
+        type: choice
+        options: [sample-backend]
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    runs-on: ubuntu-24.04
+    steps:
+      # Pull requests opened with GITHUB_TOKEN do not trigger other workflows,
+      # so ci would never run on them. A GitHub App token does not have that
+      # limitation and is scoped to this repo only.
+      - id: app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.PROMOTION_APP_ID }}
+          private-key: ${{ secrets.PROMOTION_APP_KEY }}
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          token: ${{ steps.app.outputs.token }}
+      - name: open the promotion pull request
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          WORKLOAD: ${{ inputs.workload }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
+        run: |
+          staging="environments/staging/$WORKLOAD/values.yaml"
+          prod="environments/prod/$WORKLOAD/values.yaml"
+          digest=$(yq '.image.digest' "$staging")
+
+          if [[ $(yq '.image.digest' "$prod") == "$digest" ]]; then
+            echo "prod already runs $digest" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          user_id=$(gh api "/users/${APP_SLUG}[bot]" --jq .id)
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${user_id}+${APP_SLUG}[bot]@users.noreply.github.com"
+
+          branch="promote/prod/$WORKLOAD-${digest#sha256:}"
+          branch=${branch:0:60}
+          git switch -c "$branch"
+          yq -i ".image.digest = \"$digest\"" "$prod"
+          git commit -am "feat(prod): promote $WORKLOAD to ${digest:0:19}"
+          git push -u origin "$branch"
+
+          gh pr create --base main --head "$branch" \
+            --title "feat(prod): promote $WORKLOAD to ${digest:0:19}" \
+            --body "Promotes \`$WORKLOAD\` to the digest that is running in staging:
+
+          \`\`\`
+          $digest
+          \`\`\`
+
+          The signature can be checked by hand with:
+
+          \`\`\`
+          cosign verify ghcr.io/rootsher/platform-$WORKLOAD@$digest \\
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \\
+            --certificate-identity https://github.com/rootsher/platform-$WORKLOAD/.github/workflows/ci.yml@refs/heads/main
+          \`\`\`"

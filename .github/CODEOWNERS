@@ -1,0 +1,5 @@
+# Changes to what runs in prod and to what the clusters admit need a review.
+# Staging is updated by automation and merges on green checks.
+/environments/prod/ @rootsher
+/clusters/prod/     @rootsher
+/platform/policies/ @rootsher
