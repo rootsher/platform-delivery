@@ -12,13 +12,14 @@ rules.
 
 ## Flow
 
-From a push in the service repo to a request served in a cluster. Solid lines
-exist today; dashed lines are the promotion path that is still being built.
+From a push in the service repo to a request served in a cluster. Dashed
+lines lead to the staging and prod clusters, which are defined here but not
+provisioned (ADR 7); locally the same flow runs end to end.
 
 ```mermaid
-flowchart LR
+flowchart TB
   subgraph backend["platform-sample-backend CI"]
-    direction TB
+    direction LR
     push["push to main"] --> checks["lint, type check,<br/>tests on Postgres"]
     push --> scans["gitleaks, Semgrep"]
     checks --> build["image build<br/>(distroless, non-root)"]
@@ -32,17 +33,18 @@ flowchart LR
   sign --> rekor[("Rekor<br/>transparency log")]
 
   subgraph repo["platform-delivery"]
-    direction TB
+    direction LR
     local["environments/local"]
     staging["environments/staging"]
     prod["environments/prod"]
   end
 
-  sign -. "PR with the new digest" .-> staging
-  staging -. "manual promotion PR" .-> prod
+  sign -- "auto merged PR<br/>with the new digest" --> staging
+  staging -- "promote workflow,<br/>reviewed PR" --> prod
+  checks2["ci: render, schemas,<br/>policies, parity"] -.- repo
 
   subgraph cluster["cluster"]
-    direction TB
+    direction LR
     argocd["ArgoCD<br/>ApplicationSet"] --> admission{"admission:<br/>Pod Security restricted,<br/>Kyverno"}
     admission --> db["CloudNativePG cluster"] --> migrate["migration job"] --> api["API pods"]
     api --> gateway["Envoy Gateway"]
@@ -116,9 +118,11 @@ flowchart TB
 | Pod security | Pod Security Admission | restricted level on every workload namespace |
 | Admission policies | Kyverno, CEL policy types | signed images, SBOM attestation, known registries, digests, requests and limits |
 | Supply chain | cosign keyless, Rekor | signatures and attestations made in CI, verified again at admission |
+| Promotion | GitHub Actions, a GitHub App | staging follows main by auto merged PRs; prod by a reviewed PR |
+| Checks | kubeconform, Kyverno CLI, yq | every environment rendered and checked on every PR, plus a parity check |
+| Cloud | EKS, AWS Secrets Manager, NLB | staging and prod as definitions: gp3 storage, TLS from Secrets Manager, HTTPS only |
 
-Not built yet: the staging and prod environments, promotion between them,
-Terraform for AWS (VPC, EKS, IAM, Pod Identity, ECR, Route 53) checked without
+Not built yet: Terraform for AWS (VPC, EKS, IAM, Pod Identity, ECR, Route 53) checked without
 an account, and observability (Prometheus, Loki, Tempo, OpenTelemetry).
 
 ## Layout
