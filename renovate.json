@@ -1,0 +1,85 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests",
+    "docker:pinDigests"
+  ],
+  "schedule": ["before 6am on monday"],
+  "minimumReleaseAge": "3 days",
+  "ignorePaths": ["environments/**"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Helm charts in the platform Applications. The templates contain Helm expressions, so the built in argocd manager cannot parse them.",
+      "managerFilePatterns": ["/^charts/platform-apps/templates/.+\\.yaml$/"],
+      "matchStrings": [
+        "repoURL: (?<registryUrl>https://\\S+)\\s+chart: (?<depName>\\S+)\\s+targetRevision: (?<currentValue>\\S+)"
+      ],
+      "datasourceTemplate": "helm"
+    },
+    {
+      "customType": "regex",
+      "description": "Envoy Gateway ships its chart as an OCI artifact.",
+      "managerFilePatterns": ["/^charts/platform-apps/templates/envoy-gateway\\.yaml$/"],
+      "matchStrings": [
+        "repoURL: docker\\.io/envoyproxy\\s+chart: gateway-helm\\s+targetRevision: (?<currentValue>\\S+)"
+      ],
+      "depNameTemplate": "docker.io/envoyproxy/gateway-helm",
+      "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "The CloudNativePG operator image, pinned by digest inside a template.",
+      "managerFilePatterns": ["/^charts/platform-apps/templates/cloudnative-pg\\.yaml$/"],
+      "matchStrings": [
+        "\"tag\" \"(?<currentValue>[\\d.]+)@(?<currentDigest>sha256:[a-f0-9]{64})\""
+      ],
+      "depNameTemplate": "ghcr.io/cloudnative-pg/cloudnative-pg",
+      "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "Images pinned by tag and digest anywhere else: kind nodes, Postgres, one off jobs.",
+      "managerFilePatterns": ["/^(charts|clusters)/.+\\.yaml$/"],
+      "matchStrings": [
+        "image(?:Name)?: (?<depName>[\\w.-]+(?:/[\\w.-]+)+):(?<currentValue>[\\w.-]+)@(?<currentDigest>sha256:[a-f0-9]{64})"
+      ],
+      "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "CLI versions installed in CI.",
+      "managerFilePatterns": ["/^\\.github/workflows/.+\\.ya?ml$/"],
+      "matchStrings": [
+        "KUBECONFORM_VERSION: (?<currentValue>\\S+)",
+        "KYVERNO_VERSION: (?<currentValue>\\S+)",
+        "setup-helm@\\S+ # \\S+\\n\\s+with:\\n\\s+version: (?<currentValue>\\S+)"
+      ],
+      "depNameTemplate": "{{#if (containsString matchString 'KUBECONFORM')}}yannh/kubeconform{{else if (containsString matchString 'KYVERNO')}}kyverno/kyverno{{else}}helm/helm{{/if}}",
+      "datasourceTemplate": "github-releases"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "The operator image and its chart move together.",
+      "matchDepNames": ["cloudnative-pg", "ghcr.io/cloudnative-pg/cloudnative-pg"],
+      "groupName": "cloudnative-pg"
+    },
+    {
+      "description": "The CLI in CI evaluates the same policies as the admission controller.",
+      "matchDepNames": ["kyverno", "kyverno/kyverno"],
+      "groupName": "kyverno"
+    },
+    {
+      "description": "Platform components change what every cluster admits and runs, so they are reviewed, never auto merged.",
+      "matchFileNames": ["charts/platform-apps/**", "clusters/**"],
+      "automerge": false
+    },
+    {
+      "matchUpdateTypes": ["patch", "digest"],
+      "matchFileNames": [".github/**"],
+      "automerge": true
+    }
+  ]
+}
