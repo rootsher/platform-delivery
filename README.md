@@ -120,6 +120,8 @@ flowchart TB
 | Supply chain | cosign keyless, Rekor | signatures and attestations made in CI, verified again at admission |
 | Promotion | GitHub Actions, a GitHub App | staging follows main by auto merged PRs; prod by a reviewed PR |
 | Checks | kubeconform, Kyverno CLI, yq | every environment rendered and checked on every PR, plus a parity check |
+| Dependencies | Renovate | charts, pinned images, actions and CI tools; platform changes are always reviewed |
+| Runtime scanning | Grype, nightly | every digest deployed anywhere is rescanned; findings open an issue |
 | Cloud | EKS, AWS Secrets Manager, NLB | staging and prod as definitions: gp3 storage, TLS from Secrets Manager, HTTPS only |
 
 Not built yet: Terraform for AWS (VPC, EKS, IAM, Pod Identity, ECR, Route 53) checked without

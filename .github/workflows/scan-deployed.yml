@@ -1,0 +1,91 @@
+# The image was clean when it was built. New CVEs are published every day, so
+# every night each digest that is actually deployed somewhere gets scanned
+# again. A finding opens (or updates) an issue instead of failing silently in
+# a log nobody reads.
+name: scan-deployed
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  list:
+    runs-on: ubuntu-24.04
+    outputs:
+      images: ${{ steps.list.outputs.images }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - id: list
+        # One entry per distinct digest, with the environments running it.
+        run: |
+          images=$(for values in environments/*/*/values.yaml; do
+              env=$(basename "$(dirname "$(dirname "$values")")")
+              workload=$(basename "$(dirname "$values")")
+              digest=$(yq '.image.digest' "$values")
+              repo=$(helm show values "charts/$workload" 2>/dev/null | yq '.image.repository')
+              jq -cn --arg ref "$repo@$digest" --arg env "$env" --arg workload "$workload" \
+                '{ref: $ref, env: $env, workload: $workload}'
+            done | jq -cs 'group_by(.ref) | map({ref: .[0].ref, workload: .[0].workload, envs: (map(.env) | join(", "))})')
+          echo "images=$images" >> "$GITHUB_OUTPUT"
+
+  scan:
+    needs: list
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+      issues: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.list.outputs.images) }}
+    steps:
+      - uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: grype
+        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
+        with:
+          image: ${{ matrix.image.ref }}
+          fail-build: false
+          severity-cutoff: high
+          only-fixed: true
+          output-format: json
+      - name: report
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REF: ${{ matrix.image.ref }}
+          ENVS: ${{ matrix.image.envs }}
+          WORKLOAD: ${{ matrix.image.workload }}
+          REPORT: ${{ steps.grype.outputs.json }}
+        run: |
+          table=$(jq -r '.matches[]
+            | select(.vulnerability.severity == "High" or .vulnerability.severity == "Critical")
+            | select(.vulnerability.fix.state == "fixed")
+            | [.vulnerability.id, .vulnerability.severity, .artifact.name, .artifact.version, (.vulnerability.fix.versions | join(" "))]
+            | @tsv' "$REPORT" | sort -u | column -t -s $'\t')
+          findings=$(grep -c . <<<"$table" || true)
+          title="Fixable high or critical vulnerabilities in $WORKLOAD (${REF##*@})"
+          existing=$(gh issue list --state open --label vulnerability --search "in:title \"${REF##*@}\"" --json number --jq '.[0].number')
+
+          if [[ $findings -eq 0 ]]; then
+            echo "no fixable high or critical findings in $REF" >> "$GITHUB_STEP_SUMMARY"
+            [[ -n $existing ]] && gh issue close "$existing" --comment "Clean on the scan of $(date -u +%F)."
+            exit 0
+          fi
+
+          body=$(printf 'Deployed in: %s\n\nImage: `%s`\n\n```\n%s\n```\n\nFix by rebuilding the service with updated dependencies and promoting the new digest.' \
+            "$ENVS" "$REF" "$table")
+          if [[ -n $existing ]]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "$title" --label vulnerability --body "$body"
+          fi
+          exit 1
