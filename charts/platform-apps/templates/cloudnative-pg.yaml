@@ -11,14 +11,14 @@ spec:
   source:
     repoURL: https://cloudnative-pg.github.io/charts
     chart: cloudnative-pg
-    targetRevision: 0.28.3
+    targetRevision: 0.29.0
     helm:
       releaseName: cnpg
       {{- /*
       The operator also runs as an init container in every database pod, so it
       is pinned by digest like any other workload image.
       */}}
-      {{- $defaults := dict "image" (dict "tag" "1.29.1@sha256:0dfff19ba7b52ca25851a1010028b6940fff2e233290465af1cfb08a5f3f4661") }}
+      {{- $defaults := dict "image" (dict "tag" "1.30.0@sha256:a2701eb97cdd2a34b1fdb2cb51987f544b706e40bec72ae7146cd8580efefebb") }}
       valuesObject:
         {{- mergeOverwrite $defaults .Values.components.cloudnativePg | toYaml | nindent 8 }}
   destination:
