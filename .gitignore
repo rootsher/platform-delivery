@@ -1,3 +1,7 @@
 .kube/
 *.tgz
 charts/*/charts/
+.terraform/
+*.tfstate
+*.tfstate.*
+infra/aws/modules/*/.terraform.lock.hcl
