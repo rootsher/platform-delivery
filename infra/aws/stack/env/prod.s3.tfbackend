@@ -1,0 +1,5 @@
+bucket       = "rootsher-platform-tfstate-222222222222"
+key          = "prod/terraform.tfstate"
+region       = "eu-central-1"
+encrypt      = true
+use_lockfile = true
