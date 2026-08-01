@@ -9,6 +9,10 @@ revision: main
 # Sizes belong here; anything that is not a size needs a reason in an ADR.
 components:
   argocd: {}
+  # Cloud clusters only. clusterName, region and vpcId come from the
+  # terraform outputs of infra/aws/stack.
+  awsLoadBalancerController:
+    enabled: false
   cloudnativePg: {}
   envoyGateway: {}
   externalSecrets: {}

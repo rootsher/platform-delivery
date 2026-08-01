@@ -7,3 +7,10 @@ components:
   kyverno:
     admissionController:
       replicas: 3
+  awsLoadBalancerController:
+    enabled: true
+    # terraform -chdir=infra/aws/stack output
+    clusterName: platform-prod
+    region: eu-central-1
+    vpcId: vpc-0f1e2d3c4b5a69788
+    replicaCount: 2

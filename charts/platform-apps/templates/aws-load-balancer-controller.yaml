@@ -1,0 +1,33 @@
+{{- with .Values.components.awsLoadBalancerController }}
+{{- if .enabled }}
+# Turns the Envoy LoadBalancer Service into a network load balancer. Its IAM
+# role comes from Pod Identity (infra/aws), so the service account carries no
+# annotations and there are no keys.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: aws-load-balancer-controller
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  project: default
+  source:
+    repoURL: https://aws.github.io/eks-charts
+    chart: aws-load-balancer-controller
+    targetRevision: 3.5.0
+    helm:
+      releaseName: aws-load-balancer-controller
+      valuesObject:
+        {{- omit . "enabled" | toYaml | nindent 8 }}
+        serviceAccount:
+          name: aws-load-balancer-controller
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+{{- end }}
+{{- end }}
