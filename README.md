@@ -123,9 +123,9 @@ flowchart TB
 | Dependencies | Renovate | charts, pinned images, actions and CI tools; platform changes are always reviewed |
 | Runtime scanning | Grype, nightly | every digest deployed anywhere is rescanned; findings open an issue |
 | Cloud | EKS, AWS Secrets Manager, NLB | staging and prod as definitions: gp3 storage, TLS from Secrets Manager, HTTPS only |
+| Infrastructure | Terraform, tflint, trivy | VPC, EKS on Bottlerocket, KMS, Pod Identity roles, Route 53; tested with a mocked provider |
 
-Not built yet: Terraform for AWS (VPC, EKS, IAM, Pod Identity, ECR, Route 53) checked without
-an account, and observability (Prometheus, Loki, Tempo, OpenTelemetry).
+Not built yet: observability (Prometheus, Loki, Tempo, OpenTelemetry).
 
 ## Layout
 
@@ -135,7 +135,8 @@ charts/          Helm charts: the workloads, and platform-apps with one cluster'
 clusters/        per cluster: root app, its values, and what differs from others
 environments/    one directory per environment, only values live here
 platform/        manifests shared by every cluster (gateway, policies)
-scripts/         the smoke test
+scripts/         the smoke test and the checks CI runs
+infra/aws/       Terraform: one root module, one variables file per environment
 docs/adr/        decisions and the reasons behind them
 ```
 

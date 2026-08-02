@@ -10,7 +10,7 @@ ARGOCD_CHART := $(shell awk '/chart: argo-cd/ { getline; print $$2 }' charts/pla
 # not from the working copy, so it has to be able to authenticate.
 REPO_TOKEN ?=
 
-.PHONY: up down cluster argocd repo-creds root wait smoke password check
+.PHONY: up down cluster argocd repo-creds root wait smoke password check check-infra
 
 up: cluster argocd repo-creds root wait smoke
 
@@ -62,6 +62,9 @@ password:
 check:
 	@scripts/check.sh
 	@scripts/check-parity.sh
+
+check-infra:
+	@scripts/check-infra.sh
 
 down:
 	kind delete cluster --name $(CLUSTER)
