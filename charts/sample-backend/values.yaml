@@ -15,6 +15,21 @@ resources:
 
 logLevel: info
 
+# Set by the workloads ApplicationSet from the cluster name.
+environment: ""
+
+telemetry:
+  # Traces go to the node's OpenTelemetry collector. Metrics are scraped by
+  # Prometheus from /metrics, so the SDK does not export them a second time.
+  otlpEndpoint: http://otel-collector.monitoring.svc:4318
+
+slo:
+  # Share of non 5xx responses over 30 days, and share of requests answered
+  # within latencyThreshold seconds (must be one of the histogram buckets).
+  availability: 0.995
+  latency: 0.95
+  latencyThreshold: "0.25"
+
 # Seconds the pod keeps serving after it is marked for deletion, so that
 # endpoints and load balancers stop sending traffic before SIGTERM arrives.
 drainDelaySeconds: 5

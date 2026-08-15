@@ -5,3 +5,4 @@ charts/*/charts/
 *.tfstate
 *.tfstate.*
 infra/aws/modules/*/.terraform.lock.hcl
+charts/sample-backend/tests/rules.yaml

@@ -1,0 +1,87 @@
+{{- /*
+SLO alerts as multi window, multi burn rate rules (Google SRE workbook,
+chapter 5). A fast burn pages, a slow burn opens a ticket. Probes are not
+user traffic and are left out of both ratios.
+*/ -}}
+{{- $name := include "sample-backend.name" . -}}
+{{- $sel := printf "namespace=%q, job=%q, route!~\"/healthz|/readyz\"" .Release.Namespace $name -}}
+{{- $errBudget := subf 1 .Values.slo.availability -}}
+{{- $latBudget := subf 1 .Values.slo.latency -}}
+{{- $runbooks := "https://github.com/rootsher/platform-delivery/blob/main/docs/runbooks" -}}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ $name }}-slo
+  labels:
+    {{- include "sample-backend.labels" . | nindent 4 }}
+spec:
+  groups:
+    - name: {{ $name }}-slo-ratios
+      rules:
+        {{- range list "5m" "30m" "1h" "6h" "3d" "30d" }}
+        - record: slo:errors:ratio_rate{{ . }}
+          expr: |
+            sum(rate(http_request_duration_seconds_count{ {{- $sel }}, status_code=~"5.."}[{{ . }}]))
+            /
+            sum(rate(http_request_duration_seconds_count{ {{- $sel }}}[{{ . }}]))
+          labels:
+            service: {{ $name }}
+        - record: slo:slow_requests:ratio_rate{{ . }}
+          expr: |
+            1 - (
+              sum(rate(http_request_duration_seconds_bucket{ {{- $sel }}, le="{{ $.Values.slo.latencyThreshold }}"}[{{ . }}]))
+              /
+              sum(rate(http_request_duration_seconds_count{ {{- $sel }}}[{{ . }}]))
+            )
+          labels:
+            service: {{ $name }}
+        {{- end }}
+
+    - name: {{ $name }}-slo-alerts
+      rules:
+        {{- range $slo := list (dict "kind" "errors" "title" "Availability" "budget" $errBudget "target" $.Values.slo.availability) (dict "kind" "slow_requests" "title" "Latency" "budget" $latBudget "target" $.Values.slo.latency) }}
+        - alert: {{ $.Chart.Name | camelcase }}{{ $slo.title }}BudgetFastBurn
+          # 2% of the monthly budget in an hour, or 5% in six hours.
+          expr: |
+            (
+              slo:{{ $slo.kind }}:ratio_rate1h{service="{{ $name }}"} > (14.4 * {{ $slo.budget }})
+              and
+              slo:{{ $slo.kind }}:ratio_rate5m{service="{{ $name }}"} > (14.4 * {{ $slo.budget }})
+            )
+            or
+            (
+              slo:{{ $slo.kind }}:ratio_rate6h{service="{{ $name }}"} > (6 * {{ $slo.budget }})
+              and
+              slo:{{ $slo.kind }}:ratio_rate30m{service="{{ $name }}"} > (6 * {{ $slo.budget }})
+            )
+          labels:
+            severity: page
+            service: {{ $name }}
+          annotations:
+            summary: {{ $name }} is burning its {{ lower $slo.title }} error budget fast
+            description: At this rate the {{ mulf $slo.target 100 }}% {{ lower $slo.title }} objective for 30 days is gone within days.
+            runbook_url: {{ $runbooks }}/sample-backend-{{ lower $slo.title }}.md
+        - alert: {{ $.Chart.Name | camelcase }}{{ $slo.title }}BudgetSlowBurn
+          # 10% of the monthly budget in three days.
+          expr: |
+            slo:{{ $slo.kind }}:ratio_rate3d{service="{{ $name }}"} > {{ $slo.budget }}
+            and
+            slo:{{ $slo.kind }}:ratio_rate6h{service="{{ $name }}"} > {{ $slo.budget }}
+          labels:
+            severity: ticket
+            service: {{ $name }}
+          annotations:
+            summary: {{ $name }} is slowly eating its {{ lower $slo.title }} error budget
+            runbook_url: {{ $runbooks }}/sample-backend-{{ lower $slo.title }}.md
+        {{- end }}
+
+    - name: {{ $name }}-release
+      rules:
+        - alert: {{ .Chart.Name | camelcase }}MigrationFailed
+          expr: kube_job_status_failed{namespace="{{ .Release.Namespace }}", job_name="{{ $name }}-migrate"} > 0
+          labels:
+            severity: page
+            service: {{ $name }}
+          annotations:
+            summary: The {{ $name }} migration job failed, the release is stuck before its pods start
+            runbook_url: {{ $runbooks }}/sample-backend-migration.md

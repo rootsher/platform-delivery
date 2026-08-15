@@ -44,6 +44,16 @@ spec:
           env:
             - name: LOG_LEVEL
               value: {{ .Values.logLevel | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Chart.Name }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.telemetry.otlpEndpoint | quote }}
+            - name: OTEL_METRICS_EXPORTER
+              value: none
+            - name: OTEL_LOGS_EXPORTER
+              value: none
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: deployment.environment.name={{ required "environment is required" .Values.environment }},service.version={{ .Values.image.digest | trunc 19 }}
             {{- include "sample-backend.databaseEnv" . | nindent 12 }}
           # /healthz never touches the database, so a Postgres failover does
           # not restart every pod. /readyz does, and takes the pod out of the

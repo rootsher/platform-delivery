@@ -1,0 +1,50 @@
+# promtool unit tests for the rendered SLO rules; scripts/check.sh renders
+# the chart into rules.yaml next to this file before running them.
+rule_files:
+  - rules.yaml
+
+evaluation_interval: 1m
+
+tests:
+  - name: ten percent errors for an hour pages
+    interval: 1m
+    input_series:
+      - series: 'http_request_duration_seconds_count{namespace="sample-backend", job="sample-backend", route="/api/notes", status_code="200"}'
+        values: "0+54x70"
+      - series: 'http_request_duration_seconds_count{namespace="sample-backend", job="sample-backend", route="/api/notes", status_code="500"}'
+        values: "0+6x70"
+    alert_rule_test:
+      - eval_time: 65m
+        alertname: SampleBackendAvailabilityBudgetFastBurn
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              service: sample-backend
+            exp_annotations:
+              summary: sample-backend is burning its availability error budget fast
+              description: At this rate the 99.5% availability objective for 30 days is gone within days.
+              runbook_url: https://github.com/rootsher/platform-delivery/blob/main/docs/runbooks/sample-backend-availability.md
+
+  - name: a trickle of errors within budget does not page
+    interval: 1m
+    input_series:
+      - series: 'http_request_duration_seconds_count{namespace="sample-backend", job="sample-backend", route="/api/notes", status_code="200"}'
+        values: "0+999x70"
+      - series: 'http_request_duration_seconds_count{namespace="sample-backend", job="sample-backend", route="/api/notes", status_code="500"}'
+        values: "0+1x70"
+    alert_rule_test:
+      - eval_time: 65m
+        alertname: SampleBackendAvailabilityBudgetFastBurn
+        exp_alerts: []
+
+  - name: failing probes are not user traffic
+    interval: 1m
+    input_series:
+      - series: 'http_request_duration_seconds_count{namespace="sample-backend", job="sample-backend", route="/api/notes", status_code="200"}'
+        values: "0+100x70"
+      - series: 'http_request_duration_seconds_count{namespace="sample-backend", job="sample-backend", route="/readyz", status_code="503"}'
+        values: "0+100x70"
+    alert_rule_test:
+      - eval_time: 65m
+        alertname: SampleBackendAvailabilityBudgetFastBurn
+        exp_alerts: []
