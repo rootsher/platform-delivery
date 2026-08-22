@@ -1,0 +1,58 @@
+{{- $defaults := dict
+  "grafana" (dict
+    "admin" (dict "existingSecret" "grafana-admin" "userKey" "admin-user" "passwordKey" "admin-password")
+    "sidecar" (dict "dashboards" (dict "enabled" true "label" "grafana_dashboard" "searchNamespace" "ALL"))
+    "additionalDataSources" (list
+      (dict "name" "Loki" "uid" "loki" "type" "loki" "url" "http://loki.monitoring.svc:3100"
+        "jsonData" (dict "derivedFields" (list (dict "name" "trace_id" "matcherType" "label" "matcherRegex" "trace_id" "datasourceUid" "tempo" "url" "$${__value.raw}"))))
+      (dict "name" "Tempo" "uid" "tempo" "type" "tempo" "url" "http://tempo.monitoring.svc:3200"
+        "jsonData" (dict
+          "tracesToLogsV2" (dict "datasourceUid" "loki" "filterByTraceID" true)
+          "serviceMap" (dict "datasourceUid" "prometheus")))))
+  "prometheus" (dict "prometheusSpec" (dict
+    "serviceMonitorSelectorNilUsesHelmValues" false
+    "podMonitorSelectorNilUsesHelmValues" false
+    "ruleSelectorNilUsesHelmValues" false
+    "retention" "7d"))
+  "alertmanager" (dict "config" (dict
+    "route" (dict
+      "receiver" "tickets"
+      "group_by" (list "alertname" "service")
+      "routes" (list (dict "receiver" "pager" "matchers" (list "severity = page"))))
+    "receivers" (list (dict "name" "pager") (dict "name" "tickets"))))
+-}}
+# Prometheus, Alertmanager and Grafana. Rules and scrape targets come from
+# PrometheusRule and ServiceMonitor objects in any namespace, so workloads ship
+# their own. Alerts are routed by severity: page or ticket. The receivers are
+# left without integrations here; each cluster points them somewhere real.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+  annotations:
+    # Brings the ServiceMonitor and PrometheusRule CRDs the workloads use.
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 88.5.3
+    helm:
+      releaseName: kube-prometheus-stack
+      valuesObject:
+        {{- mergeOverwrite $defaults .Values.components.kubePrometheusStack | toYaml | nindent 8 }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    managedNamespaceMetadata:
+      labels:
+        platform.rootsher.dev/tier: platform

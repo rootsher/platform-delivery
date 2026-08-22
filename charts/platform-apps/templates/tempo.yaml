@@ -1,0 +1,36 @@
+{{- $defaults := dict
+  "tempo" (dict
+    "retention" "72h"
+    "storage" (dict "trace" (dict "backend" "local"))
+    "receivers" (dict "otlp" (dict "protocols" (dict
+      "grpc" (dict "endpoint" "0.0.0.0:4317")
+      "http" (dict "endpoint" "0.0.0.0:4318")))))
+  "persistence" (dict "enabled" true "size" "5Gi")
+-}}
+# Traces, received over OTLP from the collector.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tempo
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: tempo
+    targetRevision: 1.24.4
+    helm:
+      releaseName: tempo
+      valuesObject:
+        {{- mergeOverwrite $defaults .Values.components.tempo | toYaml | nindent 8 }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

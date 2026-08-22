@@ -4,3 +4,4 @@ resources:
   - ../../../platform/gateway
   - envoyproxy.yaml
   - argocd-route.yaml
+  - grafana-route.yaml

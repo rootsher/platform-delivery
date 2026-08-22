@@ -6,6 +6,7 @@ resources:
   - tls.yaml
   - redirect.yaml
   - argocd-route.yaml
+  - grafana-route.yaml
 patches:
   # TLS ends at the Gateway. The certificate comes from Secrets Manager
   # through external-secrets, like any other secret.

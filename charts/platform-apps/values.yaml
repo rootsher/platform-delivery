@@ -16,7 +16,11 @@ components:
   cloudnativePg: {}
   envoyGateway: {}
   externalSecrets: {}
+  kubePrometheusStack: {}
   kyverno: {}
+  loki: {}
+  opentelemetryCollector: {}
+  tempo: {}
   openbao:
     # Only the local cluster runs its own secret store.
     enabled: false

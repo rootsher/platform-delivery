@@ -1,0 +1,49 @@
+{{- $defaults := dict
+  "mode" "daemonset"
+  "fullnameOverride" "otel-collector"
+  "image" (dict "repository" "otel/opentelemetry-collector-k8s")
+  "presets" (dict
+    "logsCollection" (dict "enabled" true)
+    "kubernetesAttributes" (dict "enabled" true))
+  "service" (dict "enabled" true "internalTrafficPolicy" "Local")
+  "config" (dict
+    "exporters" (dict
+      "otlp/tempo" (dict "endpoint" "tempo.monitoring.svc:4317" "tls" (dict "insecure" true))
+      "otlphttp/loki" (dict "endpoint" "http://loki.monitoring.svc:3100/otlp"))
+    "service" (dict "pipelines" (dict
+      "traces" (dict "receivers" (list "otlp") "processors" (list "k8sattributes" "memory_limiter" "batch") "exporters" (list "otlp/tempo"))
+      "logs" (dict "receivers" (list "otlp") "processors" (list "k8sattributes" "memory_limiter" "batch") "exporters" (list "otlphttp/loki"))
+      "metrics" nil)))
+  "resources" (dict "requests" (dict "cpu" "50m" "memory" "128Mi") "limits" (dict "memory" "512Mi"))
+-}}
+# One collector per node. It tails the container logs on that node (the
+# logsCollection preset adds the filelog receiver), receives traces from the
+# pods on that node over OTLP, tags both with pod metadata and forwards them.
+# Workloads send to otel-collector.monitoring, and internalTrafficPolicy keeps
+# that traffic on the node. Metrics are scraped by Prometheus, not pushed here.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: opentelemetry-collector
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  project: default
+  source:
+    repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
+    chart: opentelemetry-collector
+    targetRevision: 0.170.0
+    helm:
+      releaseName: otel-collector
+      valuesObject:
+        {{- mergeOverwrite $defaults .Values.components.opentelemetryCollector | toYaml | nindent 8 }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

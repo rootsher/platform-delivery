@@ -31,6 +31,8 @@ spec:
           releaseName: '{{ "{{ .path.basename }}" }}'
           valueFiles:
             - '../../{{ "{{ .path.path }}" }}/values.yaml'
+          valuesObject:
+            environment: {{ $.Values.cluster }}
       destination:
         server: https://kubernetes.default.svc
         namespace: '{{ "{{ .path.basename }}" }}'

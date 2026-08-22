@@ -14,3 +14,44 @@ components:
     region: eu-central-1
     vpcId: vpc-0a1b2c3d4e5f60718
     replicaCount: 2
+  # Buckets and roles from infra/aws/stack (telemetry_buckets output); the
+  # service accounts get their credentials through Pod Identity.
+  loki:
+    loki:
+      storage:
+        type: s3
+        bucketNames:
+          chunks: rootsher-platform-staging-loki
+          ruler: rootsher-platform-staging-loki
+          admin: rootsher-platform-staging-loki
+        s3:
+          region: eu-central-1
+      schemaConfig:
+        configs:
+          - from: "2026-08-01"
+            store: tsdb
+            object_store: s3
+            schema: v13
+            index:
+              prefix: index_
+              period: 24h
+  tempo:
+    tempo:
+      storage:
+        trace:
+          backend: s3
+          s3:
+            bucket: rootsher-platform-staging-tempo
+            endpoint: s3.eu-central-1.amazonaws.com
+            region: eu-central-1
+  kubePrometheusStack:
+    prometheus:
+      prometheusSpec:
+        retention: 15d
+        storageSpec:
+          volumeClaimTemplate:
+            spec:
+              storageClassName: gp3
+              resources:
+                requests:
+                  storage: 50Gi
