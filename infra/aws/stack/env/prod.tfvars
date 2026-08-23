@@ -10,4 +10,6 @@ admin_role_arns = ["arn:aws:iam::222222222222:role/platform-admin"]
 node_instance_types = ["m7i.xlarge", "m6i.xlarge"]
 node_count          = { min = 3, desired = 3, max = 9 }
 
-dns_zone = "rootsher.dev"
+dns_zone             = "rootsher.dev"
+log_retention_days   = 90
+trace_retention_days = 14

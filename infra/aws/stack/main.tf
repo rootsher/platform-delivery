@@ -102,3 +102,102 @@ module "load_balancer_controller_identity" {
 resource "aws_route53_zone" "this" {
   name = var.dns_zone
 }
+
+# Object storage for Loki and Tempo. Encrypted, private, and expired after the
+# retention the charts are configured with, so the bucket never outgrows what
+# anyone can query.
+locals {
+  telemetry_stores = {
+    loki  = { service_account = "loki", retention_days = var.log_retention_days }
+    tempo = { service_account = "tempo", retention_days = var.trace_retention_days }
+  }
+}
+
+resource "aws_kms_key" "telemetry" {
+  description         = "${local.name}: log and trace storage"
+  enable_key_rotation = true
+}
+
+resource "aws_s3_bucket" "telemetry" {
+  for_each = local.telemetry_stores
+  bucket   = "rootsher-${local.name}-${each.key}"
+}
+
+resource "aws_s3_bucket_public_access_block" "telemetry" {
+  for_each                = aws_s3_bucket.telemetry
+  bucket                  = each.value.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "telemetry" {
+  for_each = aws_s3_bucket.telemetry
+  bucket   = each.value.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.telemetry.arn
+    }
+    bucket_key_enabled = true
+  }
+}
+
+resource "aws_s3_bucket_versioning" "telemetry" {
+  for_each = aws_s3_bucket.telemetry
+  bucket   = each.value.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "telemetry" {
+  for_each = aws_s3_bucket.telemetry
+  bucket   = each.value.id
+
+  rule {
+    id     = "retention"
+    status = "Enabled"
+    filter {}
+
+    expiration {
+      days = local.telemetry_stores[each.key].retention_days
+    }
+    noncurrent_version_expiration {
+      noncurrent_days = 7
+    }
+  }
+}
+
+module "telemetry_identity" {
+  source   = "../modules/pod-identity"
+  for_each = local.telemetry_stores
+
+  name            = "${local.name}-${each.key}"
+  cluster_name    = module.cluster.name
+  namespace       = "monitoring"
+  service_account = each.value.service_account
+  policy_json = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket"]
+        Resource = aws_s3_bucket.telemetry[each.key].arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+        Resource = "${aws_s3_bucket.telemetry[each.key].arn}/*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt", "kms:GenerateDataKey"]
+        Resource = aws_kms_key.telemetry.arn
+      },
+    ]
+  })
+}

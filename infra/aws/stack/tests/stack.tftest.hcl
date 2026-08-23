@@ -31,3 +31,17 @@ run "external_secrets_reads_only_its_own_environment" {
     error_message = "external-secrets must be limited to secrets under the environment prefix."
   }
 }
+
+run "telemetry_buckets_are_private_and_encrypted" {
+  command = plan
+
+  assert {
+    condition     = alltrue([for b in aws_s3_bucket_public_access_block.telemetry : b.block_public_acls && b.restrict_public_buckets])
+    error_message = "Log and trace buckets must block every kind of public access."
+  }
+
+  assert {
+    condition     = alltrue([for c in aws_s3_bucket_server_side_encryption_configuration.telemetry : one(c.rule).apply_server_side_encryption_by_default[0].sse_algorithm == "aws:kms"])
+    error_message = "Log and trace buckets must be encrypted with the KMS key."
+  }
+}

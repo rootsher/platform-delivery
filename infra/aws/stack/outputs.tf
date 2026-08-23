@@ -17,3 +17,8 @@ output "dns_name_servers" {
   description = "Delegate the zone to these from the parent domain."
   value       = aws_route53_zone.this.name_servers
 }
+
+output "telemetry_buckets" {
+  description = "Buckets for the Loki and Tempo values of the cluster."
+  value       = { for k, b in aws_s3_bucket.telemetry : k => b.bucket }
+}

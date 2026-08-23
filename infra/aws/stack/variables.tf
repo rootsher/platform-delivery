@@ -65,3 +65,15 @@ variable "dns_zone" {
   description = "Hosted zone for this environment's hostnames."
   type        = string
 }
+
+variable "log_retention_days" {
+  description = "How long Loki keeps logs in S3."
+  type        = number
+  default     = 30
+}
+
+variable "trace_retention_days" {
+  description = "How long Tempo keeps traces in S3."
+  type        = number
+  default     = 7
+}
