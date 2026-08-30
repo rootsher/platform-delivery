@@ -108,7 +108,7 @@ flowchart TB
 
 | Layer | Tool | Role |
 | --- | --- | --- |
-| Local cluster | kind, Kubernetes 1.36 | one control plane and two workers, so spreading and failover are real |
+| Local cluster | kind, Kubernetes 1.37 | one control plane and two workers, so spreading and failover are real |
 | Packaging | Helm | one chart per workload; environments only supply values |
 | GitOps | ArgoCD with ApplicationSet | app of apps from `clusters/<env>/root.yaml`; ArgoCD also manages itself |
 | Database | CloudNativePG, Postgres 18 | a two instance cluster per workload; the operator writes the credentials Secret |

@@ -12,7 +12,7 @@ schemas=(
   -schema-location default
   -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
 )
-validate() { kubeconform -strict -summary -kubernetes-version 1.36.0 "${schemas[@]}" "$@"; }
+validate() { kubeconform -strict -summary -kubernetes-version 1.37.0 "${schemas[@]}" "$@"; }
 
 for cluster in clusters/*/; do
   env=$(basename "$cluster")
