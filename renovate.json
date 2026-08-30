@@ -5,14 +5,20 @@
     "helpers:pinGitHubActionDigests",
     "docker:pinDigests"
   ],
-  "schedule": ["before 6am on monday"],
+  "schedule": [
+    "before 6am on monday"
+  ],
   "minimumReleaseAge": "3 days",
-  "ignorePaths": ["environments/**"],
+  "ignorePaths": [
+    "environments/**"
+  ],
   "customManagers": [
     {
       "customType": "regex",
       "description": "Helm charts in the platform Applications. The templates contain Helm expressions, so the built in argocd manager cannot parse them.",
-      "managerFilePatterns": ["/^charts/platform-apps/templates/.+\\.yaml$/"],
+      "managerFilePatterns": [
+        "/^charts/platform-apps/templates/.+\\.yaml$/"
+      ],
       "matchStrings": [
         "repoURL: (?<registryUrl>https://\\S+)\\s+chart: (?<depName>\\S+)\\s+targetRevision: (?<currentValue>\\S+)"
       ],
@@ -21,7 +27,9 @@
     {
       "customType": "regex",
       "description": "Envoy Gateway ships its chart as an OCI artifact.",
-      "managerFilePatterns": ["/^charts/platform-apps/templates/envoy-gateway\\.yaml$/"],
+      "managerFilePatterns": [
+        "/^charts/platform-apps/templates/envoy-gateway\\.yaml$/"
+      ],
       "matchStrings": [
         "repoURL: docker\\.io/envoyproxy\\s+chart: gateway-helm\\s+targetRevision: (?<currentValue>\\S+)"
       ],
@@ -31,7 +39,9 @@
     {
       "customType": "regex",
       "description": "The CloudNativePG operator image, pinned by digest inside a template.",
-      "managerFilePatterns": ["/^charts/platform-apps/templates/cloudnative-pg\\.yaml$/"],
+      "managerFilePatterns": [
+        "/^charts/platform-apps/templates/cloudnative-pg\\.yaml$/"
+      ],
       "matchStrings": [
         "\"tag\" \"(?<currentValue>[\\d.]+)@(?<currentDigest>sha256:[a-f0-9]{64})\""
       ],
@@ -41,7 +51,9 @@
     {
       "customType": "regex",
       "description": "Images pinned by tag and digest anywhere else: kind nodes, Postgres, one off jobs.",
-      "managerFilePatterns": ["/^(charts|clusters)/.+\\.yaml$/"],
+      "managerFilePatterns": [
+        "/^(charts|clusters)/.+\\.yaml$/"
+      ],
       "matchStrings": [
         "image(?:Name)?: (?<depName>[\\w.-]+(?:/[\\w.-]+)+):(?<currentValue>[\\w.-]+)@(?<currentDigest>sha256:[a-f0-9]{64})"
       ],
@@ -49,36 +61,123 @@
     },
     {
       "customType": "regex",
-      "description": "CLI versions installed in CI.",
-      "managerFilePatterns": ["/^\\.github/workflows/.+\\.ya?ml$/"],
+      "description": "yannh/kubeconform installed in CI.",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/.+\\.ya?ml$/"
+      ],
       "matchStrings": [
-        "KUBECONFORM_VERSION: (?<currentValue>\\S+)",
-        "KYVERNO_VERSION: (?<currentValue>\\S+)",
+        "KUBECONFORM_VERSION: (?<currentValue>\\S+)"
+      ],
+      "depNameTemplate": "yannh/kubeconform",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "description": "kyverno/kyverno installed in CI.",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/.+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "KYVERNO_VERSION: (?<currentValue>\\S+)"
+      ],
+      "depNameTemplate": "kyverno/kyverno",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "description": "prometheus/prometheus installed in CI.",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/.+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "PROMETHEUS_VERSION: (?<currentValue>\\S+)"
+      ],
+      "depNameTemplate": "prometheus/prometheus",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "description": "hashicorp/terraform installed in CI.",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/.+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "TERRAFORM_VERSION: (?<currentValue>\\S+)"
+      ],
+      "depNameTemplate": "hashicorp/terraform",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
+      "customType": "regex",
+      "description": "terraform-linters/tflint installed in CI.",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/.+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "TFLINT_VERSION: (?<currentValue>\\S+)"
+      ],
+      "depNameTemplate": "terraform-linters/tflint",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "description": "aquasecurity/trivy installed in CI.",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/.+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "TRIVY_VERSION: (?<currentValue>\\S+)"
+      ],
+      "depNameTemplate": "aquasecurity/trivy",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "description": "helm/helm installed in CI.",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/.+\\.ya?ml$/"
+      ],
+      "matchStrings": [
         "setup-helm@\\S+ # \\S+\\n\\s+with:\\n\\s+version: (?<currentValue>\\S+)"
       ],
-      "depNameTemplate": "{{#if (containsString matchString 'KUBECONFORM')}}yannh/kubeconform{{else if (containsString matchString 'KYVERNO')}}kyverno/kyverno{{else}}helm/helm{{/if}}",
+      "depNameTemplate": "helm/helm",
       "datasourceTemplate": "github-releases"
     }
   ],
   "packageRules": [
     {
       "description": "The operator image and its chart move together.",
-      "matchDepNames": ["cloudnative-pg", "ghcr.io/cloudnative-pg/cloudnative-pg"],
+      "matchDepNames": [
+        "cloudnative-pg",
+        "ghcr.io/cloudnative-pg/cloudnative-pg"
+      ],
       "groupName": "cloudnative-pg"
     },
     {
       "description": "The CLI in CI evaluates the same policies as the admission controller.",
-      "matchDepNames": ["kyverno", "kyverno/kyverno"],
+      "matchDepNames": [
+        "kyverno",
+        "kyverno/kyverno"
+      ],
       "groupName": "kyverno"
     },
     {
       "description": "Platform components change what every cluster admits and runs, so they are reviewed, never auto merged.",
-      "matchFileNames": ["charts/platform-apps/**", "clusters/**"],
+      "matchFileNames": [
+        "charts/platform-apps/**",
+        "clusters/**"
+      ],
       "automerge": false
     },
     {
-      "matchUpdateTypes": ["patch", "digest"],
-      "matchFileNames": [".github/**"],
+      "matchUpdateTypes": [
+        "patch",
+        "digest"
+      ],
+      "matchFileNames": [
+        ".github/**"
+      ],
       "automerge": true
     }
   ]
