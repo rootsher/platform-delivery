@@ -122,10 +122,30 @@ flowchart TB
 | Checks | kubeconform, Kyverno CLI, yq | every environment rendered and checked on every PR, plus a parity check |
 | Dependencies | Renovate | charts, pinned images, actions and CI tools; platform changes are always reviewed |
 | Runtime scanning | Grype, nightly | every digest deployed anywhere is rescanned; findings open an issue |
+| Metrics and alerts | kube-prometheus-stack | ServiceMonitor and SLO burn rate rules shipped in the workload chart, tested with promtool |
+| Traces and logs | OpenTelemetry collector, Tempo, Loki | one collector per node for traces and container logs; S3 in the cloud |
+| Dashboards | Grafana | SLO dashboard from git, log to trace links |
 | Cloud | EKS, AWS Secrets Manager, NLB | staging and prod as definitions: gp3 storage, TLS from Secrets Manager, HTTPS only |
 | Infrastructure | Terraform, tflint, trivy | VPC, EKS on Bottlerocket, KMS, Pod Identity roles, Route 53; tested with a mocked provider |
 
-Not built yet: observability (Prometheus, Loki, Tempo, OpenTelemetry).
+### Telemetry
+
+```mermaid
+flowchart LR
+  api["API pods"] -- "OTLP traces" --> otel["OpenTelemetry collector<br/>(one per node)"]
+  pods["container logs<br/>on the node"] -- "filelog" --> otel
+  otel -- traces --> tempo[("Tempo")]
+  otel -- "logs over OTLP" --> loki[("Loki")]
+  prom["Prometheus"] -- "scrapes /metrics" --> api
+  prom -- "SLO burn rate rules" --> am["Alertmanager"]
+  am -- "severity=page" --> pager(("pager"))
+  am -- "severity=ticket" --> tickets(("tickets"))
+  grafana["Grafana"] --> prom
+  grafana --> tempo
+  grafana --> loki
+```
+
+Every alert carries a link to its runbook in [docs/runbooks](docs/runbooks).
 
 ## Layout
 
@@ -134,17 +154,18 @@ bootstrap/       what has to exist before ArgoCD can manage the rest
 charts/          Helm charts: the workloads, and platform-apps with one cluster's Applications
 clusters/        per cluster: root app, its values, and what differs from others
 environments/    one directory per environment, only values live here
-platform/        manifests shared by every cluster (gateway, policies)
+platform/        manifests shared by every cluster (gateway, policies, dashboards)
 scripts/         the smoke test and the checks CI runs
 infra/aws/       Terraform: one root module, one variables file per environment
 docs/adr/        decisions and the reasons behind them
+docs/runbooks/   what to do when an alert fires
 ```
 
 An environment is a directory. Adding one means adding values, not templates.
 
 ## Running it locally
 
-Needs Docker, kind, kubectl, helm and jq, and about 6 GB of free memory.
+Needs Docker, kind, kubectl, helm and jq, and about 10 GB of free memory.
 
 ```sh
 make up        # cluster, ArgoCD, then everything else through GitOps
@@ -157,8 +178,9 @@ there ArgoCD takes over managing itself, installs the operators and syncs the
 workloads from `environments/local`. The last step is a smoke test that writes
 a note through the Gateway and reads it back.
 
-Once it is up, http://notes.localhost:8080/api/notes is the service and
-http://argocd.localhost:8080 is ArgoCD.
+Once it is up, http://notes.localhost:8080/api/notes is the service,
+http://argocd.localhost:8080 is ArgoCD and http://grafana.localhost:8080 is
+Grafana (the admin password is in the `grafana-admin` Secret in `monitoring`).
 
 ArgoCD reads this repo from GitHub, not from the working copy, so local changes
 have to be pushed before the cluster sees them. While the repo is private, pass
