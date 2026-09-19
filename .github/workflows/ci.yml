@@ -14,9 +14,9 @@ concurrency:
 
 env:
   KUBECONFORM_VERSION: v0.8.0
-  KYVERNO_VERSION: v1.19.0
+  KYVERNO_VERSION: v1.19.1
   PROMETHEUS_VERSION: v3.14.0
-  TERRAFORM_VERSION: 1.16.1
+  TERRAFORM_VERSION: 1.16.3
   TFLINT_VERSION: v0.64.0
   TRIVY_VERSION: v0.74.0
 
@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
-          version: v4.2.4
+          version: v4.3.0
       - name: install kubeconform, kyverno and promtool
         run: |
           mkdir -p "$HOME/.local/bin"
