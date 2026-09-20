@@ -4,6 +4,16 @@ mock_provider "aws" {
       partition = "aws"
     }
   }
+  mock_data "aws_caller_identity" {
+    defaults = {
+      account_id = "111111111111"
+    }
+  }
+  mock_data "aws_region" {
+    defaults = {
+      region = "eu-central-1"
+    }
+  }
 }
 
 variables {
@@ -74,4 +84,16 @@ run "rejects_an_api_open_to_the_internet" {
   }
 
   expect_failures = [var.public_access_cidrs]
+}
+
+run "control_plane_logs_can_use_the_key" {
+  command = plan
+
+  assert {
+    condition = anytrue([
+      for st in jsondecode(aws_kms_key.cluster.policy).Statement :
+      try(st.Principal.Service, "") == "logs.eu-central-1.amazonaws.com"
+    ])
+    error_message = "CloudWatch Logs must be allowed to use the key, or the encrypted log group cannot be created."
+  }
 }

@@ -12,6 +12,11 @@ mock_provider "aws" {
       partition = "aws"
     }
   }
+  mock_data "aws_region" {
+    defaults = {
+      region = "eu-central-1"
+    }
+  }
 }
 
 run "plans_the_whole_environment" {

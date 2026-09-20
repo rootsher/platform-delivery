@@ -3,15 +3,46 @@
 # managed node group on Bottlerocket in the private subnets.
 
 data "aws_partition" "current" {}
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
 
 locals {
-  partition = data.aws_partition.current.partition
-  policy    = "arn:${local.partition}:iam::aws:policy"
+  partition  = data.aws_partition.current.partition
+  account_id = data.aws_caller_identity.current.account_id
+  region     = data.aws_region.current.region
+  policy     = "arn:${local.partition}:iam::aws:policy"
 }
 
+# EKS uses the key through the cluster role's grants. CloudWatch Logs has no
+# such grant and needs the key policy to allow it, limited to this cluster's
+# log group; with the default policy creating the log group fails.
 resource "aws_kms_key" "cluster" {
   description         = "${var.name}: EKS secrets and control plane logs"
   enable_key_rotation = true
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "AccountAdministration"
+        Effect    = "Allow"
+        Principal = { AWS = "arn:${local.partition}:iam::${local.account_id}:root" }
+        Action    = "kms:*"
+        Resource  = "*"
+      },
+      {
+        Sid       = "ControlPlaneLogs"
+        Effect    = "Allow"
+        Principal = { Service = "logs.${local.region}.amazonaws.com" }
+        Action    = ["kms:Encrypt*", "kms:Decrypt*", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:Describe*"]
+        Resource  = "*"
+        Condition = {
+          ArnEquals = {
+            "kms:EncryptionContext:aws:logs:arn" = "arn:${local.partition}:logs:${local.region}:${local.account_id}:log-group:/aws/eks/${var.name}/cluster"
+          }
+        }
+      },
+    ]
+  })
 }
 
 resource "aws_kms_alias" "cluster" {
@@ -86,6 +117,8 @@ resource "aws_eks_access_entry" "admin" {
   for_each      = toset(var.admin_role_arns)
   cluster_name  = aws_eks_cluster.this.name
   principal_arn = each.value
+  # The admission policies recognise cluster admins by this group.
+  kubernetes_groups = ["platform:admins"]
 }
 
 resource "aws_eks_access_policy_association" "admin" {
@@ -145,7 +178,8 @@ resource "aws_eks_node_group" "default" {
   }
 
   lifecycle {
-    # The cluster autoscaler owns the current size once the group exists.
+    # Changed by hand or by an autoscaler during incidents; terraform should
+    # not scale the group back on the next apply. min and max stay managed.
     ignore_changes = [scaling_config[0].desired_size]
   }
 

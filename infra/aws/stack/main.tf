@@ -97,15 +97,17 @@ module "load_balancer_controller_identity" {
   policy_json     = file("${path.module}/../policies/aws-load-balancer-controller.json")
 }
 
-# The zone for this environment's hostnames, delegated from the parent domain
-# by NS records at the registrar.
+# The zone for this environment's hostnames. prod holds rootsher.dev itself,
+# delegated at the registrar; staging.rootsher.dev is delegated by NS records
+# in the prod zone, which lives in the other account.
 resource "aws_route53_zone" "this" {
   name = var.dns_zone
 }
 
-# Object storage for Loki and Tempo. Encrypted, private, and expired after the
-# retention the charts are configured with, so the bucket never outgrows what
-# anyone can query.
+# Object storage for Loki and Tempo. Encrypted and private. Loki's compactor
+# and Tempo delete old data themselves; the lifecycle rule is a backstop with
+# the same retention as clusters/<env>/platform.yaml, so nothing outlives what
+# anyone can query even if they stop doing so.
 locals {
   telemetry_stores = {
     loki  = { service_account = "loki", retention_days = var.log_retention_days }
