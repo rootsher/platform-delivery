@@ -35,3 +35,7 @@ spec:
       - CreateNamespace=true
       - ServerSideApply=true
       - RespectIgnoreDifferences=true
+    # Exempts it from the workload policies; see platform-namespaces.
+    managedNamespaceMetadata:
+      labels:
+        platform.rootsher.dev/tier: platform

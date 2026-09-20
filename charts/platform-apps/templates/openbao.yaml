@@ -37,4 +37,8 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+    # Exempts it from the workload policies; see platform-namespaces.
+    managedNamespaceMetadata:
+      labels:
+        platform.rootsher.dev/tier: platform
 {{- end }}

@@ -1,0 +1,13 @@
+# The default namespace exists before anything here does, so nothing labels it.
+# It gets the same restricted level as any workload namespace instead of being
+# the one place Pod Security Admission does not look. ArgoCD must never prune
+# or delete it.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: default
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false,ServerSideApply=true

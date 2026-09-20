@@ -1,0 +1,35 @@
+# Being a platform namespace exempts it from the workload rules, so the label
+# that says so can only be set by ArgoCD, which applies it from this repo, or
+# by a cluster admin. Anyone else adding it to escape the policies is denied.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: platform-namespaces
+spec:
+  validationActions: [Deny]
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [namespaces]
+  variables:
+    # system:masters and kubeadm:cluster-admins are how kind's admin
+    # authenticates; platform:admins is the group the EKS access entries give
+    # the admin roles (infra/aws/modules/cluster).
+    - name: adminGroups
+      expression: "['system:masters', 'kubeadm:cluster-admins', 'platform:admins']"
+    - name: platform
+      expression: >-
+        object.metadata.?labels[?'platform.rootsher.dev/tier'].orValue('') == 'platform'
+    - name: wasPlatform
+      expression: >-
+        oldObject.?metadata.?labels[?'platform.rootsher.dev/tier'].orValue('') == 'platform'
+    - name: trusted
+      expression: >-
+        request.userInfo.username == 'system:serviceaccount:argocd:argocd-application-controller'
+        || request.userInfo.groups.exists(g, g in variables.adminGroups)
+  validations:
+    - expression: "!variables.platform || variables.wasPlatform || variables.trusted"
+      message: only ArgoCD or a cluster admin may mark a namespace as a platform namespace

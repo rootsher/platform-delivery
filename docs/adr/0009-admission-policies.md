@@ -12,7 +12,7 @@ a suggestion.
 ## Decision
 
 Pod security uses the built in Pod Security Admission at the restricted level,
-set as a label on every workload namespace. It needs no extra component and
+set as a label on every namespace that runs workloads. It needs no extra component and
 covers non-root, dropped capabilities, seccomp and privilege escalation
 exactly as the upstream standard defines them.
 
@@ -22,16 +22,19 @@ Kyverno covers what Pod Security Admission cannot:
   carry a signed SBOM attestation,
 - images must come from known registries and be pinned by digest,
 - every container needs CPU and memory requests and a memory limit,
-- workload namespaces must keep the restricted label.
+- namespaces must keep the restricted label.
 
 The policies use Kyverno's CEL based policy types rather than the older
 ClusterPolicy, and they run in Enforce mode in every environment, local
 included. A policy in Audit mode is a report nobody reads.
 
-Policies are scoped by the `platform.rootsher.dev/tier: workload` namespace
-label, which the workloads ApplicationSet sets on the namespaces it creates.
-Platform components are installed from upstream charts and are not held to
-the workload rules.
+The policies apply to every namespace except two kinds: the ones Kubernetes
+itself owns (`kube-system` and friends) and platform namespaces, marked with
+`platform.rootsher.dev/tier: platform`. Platform components come from upstream
+charts and are not held to the workload rules. The exemption is opt in, not
+the scope: a namespace nobody labelled is covered. Only ArgoCD, which sets the
+label from this repo, or a cluster admin may put it on a namespace; for anyone
+else the `platform-namespaces` policy denies it.
 
 ## Consequences
 

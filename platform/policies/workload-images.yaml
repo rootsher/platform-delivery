@@ -9,14 +9,23 @@ spec:
   validationActions: [Deny]
   failurePolicy: Fail
   matchConstraints:
+    # Everything except the platform's own namespaces (labelled by ArgoCD
+    # only, see platform-namespaces) and the ones Kubernetes itself owns. A
+    # namespace nobody labelled is in scope, not out of it.
     namespaceSelector:
-      matchLabels:
-        platform.rootsher.dev/tier: workload
+      matchExpressions:
+        - key: platform.rootsher.dev/tier
+          operator: NotIn
+          values: [platform]
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: [kube-system, kube-public, kube-node-lease, local-path-storage]
     resourceRules:
       - apiGroups: [""]
         apiVersions: [v1]
         operations: [CREATE, UPDATE]
-        resources: [pods]
+        # kubectl debug adds containers through this subresource.
+        resources: [pods, pods/ephemeralcontainers]
   variables:
     - name: containers
       expression: >-

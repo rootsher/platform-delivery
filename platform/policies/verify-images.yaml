@@ -11,14 +11,23 @@ spec:
   webhookConfiguration:
     timeoutSeconds: 15
   matchConstraints:
+    # Everything except the platform's own namespaces (labelled by ArgoCD
+    # only, see platform-namespaces) and the ones Kubernetes itself owns. A
+    # namespace nobody labelled is in scope, not out of it.
     namespaceSelector:
-      matchLabels:
-        platform.rootsher.dev/tier: workload
+      matchExpressions:
+        - key: platform.rootsher.dev/tier
+          operator: NotIn
+          values: [platform]
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: [kube-system, kube-public, kube-node-lease, local-path-storage]
     resourceRules:
       - apiGroups: [""]
         apiVersions: [v1]
         operations: [CREATE, UPDATE]
-        resources: [pods]
+        # kubectl debug adds containers through this subresource.
+        resources: [pods, pods/ephemeralcontainers]
   matchImageReferences:
     - glob: ghcr.io/rootsher/*
   attestors:
@@ -36,8 +45,10 @@ spec:
         type: https://cyclonedx.org/bom
   validations:
     - expression: >-
-        images.containers.map(image, verifyImageSignatures(image, [attestors.ci])).all(e, e > 0)
+        (images.containers + images.?initContainers.orValue([]) + images.?ephemeralContainers.orValue([]))
+          .map(image, verifyImageSignatures(image, [attestors.ci])).all(e, e > 0)
       message: images must be signed by the main branch CI workflow
     - expression: >-
-        images.containers.map(image, verifyAttestationSignatures(image, attestations.sbom, [attestors.ci])).all(e, e > 0)
+        (images.containers + images.?initContainers.orValue([]) + images.?ephemeralContainers.orValue([]))
+          .map(image, verifyAttestationSignatures(image, attestations.sbom, [attestors.ci])).all(e, e > 0)
       message: images must carry a signed CycloneDX SBOM attestation
