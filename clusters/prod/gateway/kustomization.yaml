@@ -32,3 +32,15 @@ patches:
                   - key: platform.rootsher.dev/tier
                     operator: In
                     values: [workload, platform]
+  # Plain HTTP only serves the redirect in the gateway namespace. Routes from
+  # anywhere else can attach to the https listener only, so a route that
+  # forgets sectionName is not silently served unencrypted.
+  - target:
+      kind: Gateway
+      name: public
+    patch: |-
+      - op: replace
+        path: /spec/listeners/0/allowedRoutes
+        value:
+          namespaces:
+            from: Same

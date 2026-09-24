@@ -24,3 +24,6 @@ components:
   openbao:
     # Only the local cluster runs its own secret store.
     enabled: false
+  storage:
+    # Cloud clusters only; kind brings its own default class.
+    enabled: false

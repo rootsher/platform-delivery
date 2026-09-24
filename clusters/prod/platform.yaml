@@ -1,6 +1,8 @@
 cluster: prod
 
 components:
+  storage:
+    enabled: true
   argocd:
     global:
       domain: argocd.rootsher.dev
@@ -16,8 +18,13 @@ components:
     replicaCount: 2
   # Buckets and roles from infra/aws/stack (telemetry_buckets output); the
   # service accounts get their credentials through Pod Identity.
+  # Retention matches the bucket lifecycle in infra/aws/stack/env/prod.tfvars.
   loki:
     loki:
+      limits_config:
+        retention_period: 2160h
+      compactor:
+        delete_request_store: s3
       storage:
         type: s3
         bucketNames:
@@ -37,6 +44,7 @@ components:
               period: 24h
   tempo:
     tempo:
+      retention: 336h
       storage:
         trace:
           backend: s3
@@ -47,7 +55,7 @@ components:
   kubePrometheusStack:
     prometheus:
       prometheusSpec:
-        retention: 15d
+        retention: 31d
         storageSpec:
           volumeClaimTemplate:
             spec:
