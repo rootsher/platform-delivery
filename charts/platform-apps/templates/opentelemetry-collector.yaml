@@ -11,8 +11,8 @@
       "otlp/tempo" (dict "endpoint" "tempo.monitoring.svc:4317" "tls" (dict "insecure" true))
       "otlphttp/loki" (dict "endpoint" "http://loki.monitoring.svc:3100/otlp"))
     "service" (dict "pipelines" (dict
-      "traces" (dict "receivers" (list "otlp") "processors" (list "k8sattributes" "memory_limiter" "batch") "exporters" (list "otlp/tempo"))
-      "logs" (dict "receivers" (list "otlp") "processors" (list "k8sattributes" "memory_limiter" "batch") "exporters" (list "otlphttp/loki"))
+      "traces" (dict "receivers" (list "otlp") "processors" (list "memory_limiter" "k8sattributes" "batch") "exporters" (list "otlp/tempo"))
+      "logs" (dict "receivers" (list "otlp") "processors" (list "memory_limiter" "k8sattributes" "batch") "exporters" (list "otlphttp/loki"))
       "metrics" nil)))
   "resources" (dict "requests" (dict "cpu" "50m" "memory" "128Mi") "limits" (dict "memory" "512Mi"))
 -}}
@@ -45,5 +45,10 @@ spec:
     automated:
       prune: true
       selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
+    # The namespace belongs to kube-prometheus-stack, which labels it.
+    retry:
+      limit: 10
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

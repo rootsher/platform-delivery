@@ -9,7 +9,9 @@ metadata:
   name: aws-load-balancer-controller
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "-2"
+    # Its webhook mutates every Service, so it has to be ready before the
+    # charts in wave -2 create theirs.
+    argocd.argoproj.io/sync-wave: "-3"
 spec:
   project: default
   source:

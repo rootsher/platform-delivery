@@ -7,7 +7,8 @@
     "schemaConfig" (dict "configs" (list (dict
       "from" "2026-08-01" "store" "tsdb" "object_store" "filesystem" "schema" "v13"
       "index" (dict "prefix" "index_" "period" "24h"))))
-    "limits_config" (dict "allow_structured_metadata" true "retention_period" "168h"))
+    "limits_config" (dict "allow_structured_metadata" true "retention_period" "168h")
+    "compactor" (dict "retention_enabled" true "delete_request_store" "filesystem"))
   "singleBinary" (dict "replicas" 1 "persistence" (dict "size" "5Gi"))
   "backend" (dict "replicas" 0)
   "read" (dict "replicas" 0)
@@ -20,6 +21,7 @@
 -}}
 # Logs, received over OTLP from the collector. Single binary on the local
 # filesystem by default; the cloud clusters switch the object store to S3.
+# The compactor enforces retention_period; without it logs are never deleted.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -44,5 +46,10 @@ spec:
     automated:
       prune: true
       selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
+    # The namespace belongs to kube-prometheus-stack, which labels it.
+    retry:
+      limit: 10
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

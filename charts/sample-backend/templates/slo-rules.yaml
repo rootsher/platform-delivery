@@ -78,7 +78,9 @@ spec:
     - name: {{ $name }}-release
       rules:
         - alert: {{ .Chart.Name | camelcase }}MigrationFailed
-          expr: kube_job_status_failed{namespace="{{ .Release.Namespace }}", job_name="{{ $name }}-migrate"} > 0
+          # The Job's Failed condition, set once the retries are used up. A
+          # failed attempt that a retry then fixes does not page.
+          expr: kube_job_failed{namespace="{{ .Release.Namespace }}", job_name="{{ $name }}-migrate", condition="true"} > 0
           labels:
             severity: page
             service: {{ $name }}

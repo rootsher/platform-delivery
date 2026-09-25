@@ -13,26 +13,32 @@
     "serviceMonitorSelectorNilUsesHelmValues" false
     "podMonitorSelectorNilUsesHelmValues" false
     "ruleSelectorNilUsesHelmValues" false
-    "retention" "7d"))
+    "retention" "31d"))
   "alertmanager" (dict "config" (dict
     "route" (dict
       "receiver" "tickets"
       "group_by" (list "alertname" "service")
-      "routes" (list (dict "receiver" "pager" "matchers" (list "severity = page"))))
-    "receivers" (list (dict "name" "pager") (dict "name" "tickets"))))
+      "routes" (list
+        (dict "receiver" "null" "matchers" (list "alertname =~ \"Watchdog|InfoInhibitor\""))
+        (dict "receiver" "pager" "matchers" (list "severity =~ \"page|critical\""))))
+    "receivers" (list (dict "name" "null") (dict "name" "pager") (dict "name" "tickets"))))
 -}}
 # Prometheus, Alertmanager and Grafana. Rules and scrape targets come from
 # PrometheusRule and ServiceMonitor objects in any namespace, so workloads ship
-# their own. Alerts are routed by severity: page or ticket. The receivers are
-# left without integrations here; each cluster points them somewhere real.
+# their own. Alerts are routed by severity: page (or upstream critical) goes to
+# the pager, the rest to tickets, and the always firing Watchdog nowhere. The
+# receivers are left without integrations here; each cluster points them
+# somewhere real. Retention covers the 30 day SLO window.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: kube-prometheus-stack
   namespace: argocd
   annotations:
-    # Brings the ServiceMonitor and PrometheusRule CRDs the workloads use.
-    argocd.argoproj.io/sync-wave: "-2"
+    # Same wave as the secret store and the ExternalSecret for the Grafana
+    # admin, which Grafana needs to start. Its CRDs are still in place before
+    # the workloads, which sync in wave 0.
+    argocd.argoproj.io/sync-wave: "-1"
 spec:
   project: default
   source:
