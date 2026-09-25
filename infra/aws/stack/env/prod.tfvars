@@ -3,7 +3,7 @@ vpc_cidr    = "10.30.0.0/16"
 azs         = ["eu-central-1a", "eu-central-1b", "eu-central-1c"]
 # One NAT gateway per zone: losing a zone must not cut the others off.
 single_nat_gateway = false
-kubernetes_version = "1.36"
+kubernetes_version = "1.37"
 
 admin_role_arns = ["arn:aws:iam::222222222222:role/platform-admin"]
 
