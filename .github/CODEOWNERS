@@ -1,5 +1,5 @@
-# Changes to what runs in prod and to what the clusters admit need a review.
-# Staging is updated by automation and merges on green checks.
-/environments/prod/ @rootsher
-/clusters/prod/     @rootsher
-/platform/policies/ @rootsher
+# Everything that decides what runs in prod or what any cluster admits needs
+# a review. Staging values are updated by automation and merge on green
+# checks; that is the only path left out on purpose.
+*                     @rootsher
+/environments/staging/

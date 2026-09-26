@@ -14,6 +14,10 @@ on:
 permissions:
   contents: read
 
+# Two promotions of the same workload at once would race for the same branch.
+concurrency:
+  group: promote-${{ inputs.workload }}
+
 jobs:
   promote:
     runs-on: ubuntu-24.04
@@ -48,25 +52,35 @@ jobs:
           git config user.name "${APP_SLUG}[bot]"
           git config user.email "${user_id}+${APP_SLUG}[bot]@users.noreply.github.com"
 
-          branch="promote/prod/$WORKLOAD-${digest#sha256:}"
-          branch=${branch:0:60}
-          git switch -c "$branch"
-          yq -i ".image.digest = \"$digest\"" "$prod"
-          git commit -am "feat(prod): promote $WORKLOAD to ${digest:0:19}"
-          git push -u origin "$branch"
+          # One branch per workload, rewritten on every run, so running the
+          # workflow again updates the open pull request instead of failing.
+          branch="promote/prod/$WORKLOAD"
+          title="feat(prod): promote $WORKLOAD to ${digest:0:19}"
+          git switch -C "$branch"
+          DIGEST=$digest yq -i '.image.digest = strenv(DIGEST)' "$prod"
+          git commit -am "$title"
+          git push --force origin "$branch"
 
-          gh pr create --base main --head "$branch" \
-            --title "feat(prod): promote $WORKLOAD to ${digest:0:19}" \
-            --body "Promotes \`$WORKLOAD\` to the digest that is running in staging:
+          body=$(cat <<BODY
+          Promotes \`$WORKLOAD\` to the digest currently committed for staging:
 
           \`\`\`
           $digest
           \`\`\`
 
-          The signature can be checked by hand with:
+          Check that staging is synced and healthy on it before merging. The
+          signature can be verified by hand with:
 
           \`\`\`
           cosign verify ghcr.io/rootsher/platform-$WORKLOAD@$digest \\
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \\
             --certificate-identity https://github.com/rootsher/platform-$WORKLOAD/.github/workflows/ci.yml@refs/heads/main
-          \`\`\`"
+          \`\`\`
+          BODY
+          )
+          url=$(gh pr view "$branch" --json url,state --jq 'select(.state == "OPEN") | .url' 2>/dev/null || true)
+          if [[ -n $url ]]; then
+            gh pr edit "$url" --title "$title" --body "$body"
+          else
+            gh pr create --base main --head "$branch" --title "$title" --body "$body"
+          fi

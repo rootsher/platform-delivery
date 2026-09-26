@@ -6,7 +6,7 @@
 set -euo pipefail
 
 out=$(mktemp -d)
-trap 'rm -rf "$out"' EXIT
+trap 'rm -rf "$out" charts/*/tests/rules.yaml' EXIT
 
 schemas=(
   -schema-location default
@@ -21,8 +21,9 @@ for cluster in clusters/*/; do
   helm template root charts/platform-apps -f "$cluster/platform.yaml" >"$out/$env-apps.yaml"
   kubectl kustomize "$cluster/gateway" >"$out/$env-gateway.yaml"
   kubectl kustomize "$cluster/monitoring" >"$out/$env-monitoring.yaml"
-  validate "$out/$env-apps.yaml" "$out/$env-gateway.yaml" "$out/$env-monitoring.yaml" \
-    "$cluster/root.yaml" "$cluster/secrets"
+  plain=("$cluster/root.yaml" "$cluster/secrets")
+  [[ -d "$cluster/storage" ]] && plain+=("$cluster/storage")
+  validate "$out/$env-apps.yaml" "$out/$env-gateway.yaml" "$out/$env-monitoring.yaml" "${plain[@]}"
 
   for dir in "environments/$env"/*/; do
     workload=$(basename "$dir")
@@ -38,7 +39,6 @@ for cluster in clusters/*/; do
       yq 'select(.kind == "PrometheusRule") | .spec' "$rendered" >"charts/$workload/tests/rules.yaml"
       promtool check rules "charts/$workload/tests/rules.yaml" >/dev/null
       promtool test rules "charts/$workload/tests"/*.test.yaml
-      rm "charts/$workload/tests/rules.yaml"
     fi
 
     # The namespace labels are the ones the workloads ApplicationSet sets.
