@@ -21,8 +21,10 @@ CODEOWNERS requires a review for anything under `environments/prod`,
 `clusters/prod` and `platform/policies`. The pull request carries the digest
 and the command to verify its signature.
 
-Nothing skips staging: prod only ever receives a digest that staging already
-ran, and there is no input for choosing a different one.
+Nothing skips staging: the workflow can only copy the digest currently
+committed for staging, and there is no input for choosing a different one.
+Whether staging is actually synced and healthy on it is for the reviewer to
+check; the pull request says so.
 
 Both kinds of pull request are opened with a GitHub App token, not with
 `GITHUB_TOKEN`. Pull requests opened by `GITHUB_TOKEN` do not trigger

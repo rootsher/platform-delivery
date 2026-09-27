@@ -17,7 +17,7 @@ The local kind cluster runs the same components as the cloud environments:
 ArgoCD, CloudNativePG, Gateway API, external-secrets and the same admission
 policies in Enforce mode. What changes between environments is size (replicas,
 requests, storage) and the providers behind the same interfaces (a local
-secret store instead of a cloud one, a local registry mirror).
+secret store instead of a cloud one, a NodePort instead of a load balancer).
 
 A difference between local and cloud that is not about size or provider needs
 its own record explaining why.

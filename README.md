@@ -71,22 +71,30 @@ healthy.
 ```mermaid
 flowchart TB
   kind["kind cluster"] --> install["helm install ArgoCD"] --> root["apply clusters/local/root.yaml"]
-  root --> w2
+  root --> w3
+
+  subgraph w3["wave -3: cloud clusters only"]
+    sc["gp3 StorageClass"]
+    lbc["AWS Load Balancer Controller"]
+  end
+
+  w3 --> w2
 
   subgraph w2["wave -2: operators and CRDs"]
     eg["Envoy Gateway<br/>(Gateway API CRDs)"]
     kyverno["Kyverno"]
     eso["external-secrets"]
-    bao["OpenBao"]
+    bao["OpenBao (local only)"]
   end
 
   w2 --> w1
 
-  subgraph w1["wave -1: platform configuration"]
+  subgraph w1["wave -1: platform configuration and services"]
     gw["GatewayClass, Gateway"]
     pol["admission policies"]
-    store["ClusterSecretStore,<br/>OpenBao Kubernetes auth"]
+    store["ClusterSecretStore"]
     cnpg["CloudNativePG operator"]
+    obs["Prometheus, Grafana,<br/>Loki, Tempo, collector"]
   end
 
   w1 --> w0
@@ -100,7 +108,7 @@ flowchart TB
 
   subgraph app["one Application per workload"]
     direction LR
-    cluster["wave -1<br/>Postgres cluster"] --> job["wave 0<br/>migration job"] --> deploy["wave 1<br/>Deployment, Service,<br/>HTTPRoute"]
+    cluster["wave -1<br/>Postgres cluster"] --> job["wave 0<br/>migration job, Service,<br/>HTTPRoute, alerts"] --> deploy["wave 1<br/>Deployment"]
   end
 ```
 
@@ -197,7 +205,8 @@ The reasoning is in [docs/adr](docs/adr). The short version:
 - AWS is described in Terraform and checked without an account. Nothing is
   actually provisioned; the working end to end flow is the local one.
 - Schema changes are expand then contract, so a rollback is a digest revert.
-- Pod Security Admission at restricted plus Kyverno in Enforce mode everywhere:
-  signed images by digest, known registries, requests and limits.
+- Pod Security Admission at restricted plus Kyverno in Enforce mode in every
+  environment and every namespace outside the platform's own: signed images
+  by digest, known registries, requests and limits.
 - Staging follows main through automatic pull requests; prod gets the digest
   staging already runs, through a reviewed pull request.

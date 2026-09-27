@@ -14,7 +14,8 @@ and how upgrades happen. That is exactly the kind of gap ADR 2 rules out.
 Postgres runs on CloudNativePG in every environment. The operator creates the
 cluster, the application role and a Secret with the connection details, and
 the workload reads that Secret the same way everywhere. In the cloud the
-difference is storage class, instance count and backups to object storage.
+difference is storage class and instance count. Backups to object storage
+(the Barman Cloud plugin writing to S3) are the next step and not built yet.
 
 ## Consequences
 

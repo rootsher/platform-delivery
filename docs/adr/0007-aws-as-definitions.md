@@ -4,7 +4,7 @@ Date: 2026-01-18
 
 ## Context
 
-The cloud side (VPC, EKS, IAM, Pod Identity, ECR, DNS) should be real
+The cloud side (VPC, EKS, IAM, Pod Identity, DNS) should be real
 Terraform that would work against an account. Keeping an EKS cluster running
 for a portfolio project is not worth the cost.
 
