@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# Everything that can be checked about the AWS Terraform without an AWS
-# account (ADR 7): formatting, validation, lint, a security scan, and the
-# tests, which plan every module and both environments against a mocked
-# provider and assert on the result.
+# Checks for the AWS Terraform (ADR 7): formatting, validation, lint, a
+# security scan, and the tests, which plan every module and both environments
+# and assert on the result.
 set -euo pipefail
 
 cd infra/aws

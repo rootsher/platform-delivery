@@ -13,8 +13,8 @@ rules.
 ## Flow
 
 From a push in the service repo to a request served in a cluster. Dashed
-lines lead to the staging and prod clusters, which are defined here but not
-provisioned (ADR 7); locally the same flow runs end to end.
+lines lead to the staging and prod clusters on AWS (ADR 7); locally the same
+flow runs end to end.
 
 ```mermaid
 flowchart TB
@@ -134,7 +134,7 @@ flowchart TB
 | Traces and logs | OpenTelemetry collector, Tempo, Loki | one collector per node for traces and container logs; S3 in the cloud |
 | Dashboards | Grafana | SLO dashboard from git, log to trace links |
 | Cloud | EKS, AWS Secrets Manager, NLB | staging and prod as definitions: gp3 storage, TLS from Secrets Manager, HTTPS only |
-| Infrastructure | Terraform, tflint, trivy | VPC, EKS on Bottlerocket, KMS, Pod Identity roles, Route 53; tested with a mocked provider |
+| Infrastructure | Terraform, tflint, trivy | VPC, EKS on Bottlerocket, KMS, Pod Identity roles, Route 53; checked by `terraform test`, tflint and trivy |
 
 ### Telemetry
 
@@ -202,8 +202,8 @@ The reasoning is in [docs/adr](docs/adr). The short version:
 - CloudNativePG in every environment, including local.
 - Gateway API for traffic.
 - external-secrets everywhere, with a different store per environment.
-- AWS is described in Terraform and checked without an account. Nothing is
-  actually provisioned; the working end to end flow is the local one.
+- AWS (VPC, EKS, IAM, Pod Identity, Route 53) in Terraform, with validate,
+  tflint, trivy and `terraform test` on every change.
 - Schema changes are expand then contract, so a rollback is a digest revert.
 - Pod Security Admission at restricted plus Kyverno in Enforce mode in every
   environment and every namespace outside the platform's own: signed images
