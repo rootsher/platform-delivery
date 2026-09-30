@@ -1,0 +1,49 @@
+# The AWS environments (ADR 13). A pull request gets a plan of both; a merge
+# applies staging, then prod once a reviewer approves the prod environment.
+name: infra
+
+on:
+  pull_request:
+    paths:
+      - infra/aws/**
+      - .github/workflows/infra.yml
+      - .github/workflows/terraform.yml
+  push:
+    branches: [main]
+    paths:
+      - infra/aws/**
+      - .github/workflows/infra.yml
+      - .github/workflows/terraform.yml
+  # Re-applies main, for example after drift was fixed by hand.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Applies queue up instead of cancelling each other; a newer push to a pull
+# request replaces its older plan.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  staging:
+    uses: ./.github/workflows/terraform.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      environment: staging
+      account: "111111111111"
+      apply: ${{ github.ref == 'refs/heads/main' }}
+
+  prod:
+    needs: staging
+    uses: ./.github/workflows/terraform.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      environment: prod
+      account: "222222222222"
+      apply: ${{ github.ref == 'refs/heads/main' }}

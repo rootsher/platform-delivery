@@ -179,6 +179,15 @@
         ".github/**"
       ],
       "automerge": true
+    },
+    {
+      "description": "A merge of these starts an apply to the AWS accounts, so they are always reviewed.",
+      "matchFileNames": [
+        ".github/workflows/infra.yml",
+        ".github/workflows/terraform.yml",
+        "infra/**"
+      ],
+      "automerge": false
     }
   ]
 }

@@ -1,0 +1,66 @@
+# Plans one environment and, when asked to, applies that same plan. Called by
+# infra.yml. Credentials come from GitHub OIDC and the roles in
+# infra/aws/modules/github-deploy, so there are no AWS keys in the secrets.
+name: terraform
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+      account:
+        type: string
+        required: true
+      apply:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  TERRAFORM_VERSION: 1.16.4
+
+jobs:
+  terraform:
+    name: ${{ inputs.apply && 'apply' || 'plan' }}
+    runs-on: ubuntu-24.04
+    # The apply role trusts only jobs in the GitHub environment of the same
+    # name, and prod has required reviewers on it. A plan runs outside any
+    # environment and so can only get the read only role.
+    environment: ${{ inputs.apply && inputs.environment || '' }}
+    defaults:
+      run:
+        working-directory: infra/aws/stack
+    env:
+      ENVIRONMENT: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::${{ inputs.account }}:role/platform-${{ inputs.environment }}-terraform-${{ inputs.apply && 'apply' || 'plan' }}
+          aws-region: eu-central-1
+      - run: terraform init -input=false -backend-config="env/$ENVIRONMENT.s3.tfbackend"
+      # Plans on pull requests do not take the state lock, so they never wait
+      # for an apply or block one; the plan role cannot write the lock anyway.
+      - name: plan
+        env:
+          LOCK: ${{ inputs.apply }}
+        run: |
+          terraform plan -input=false -no-color -lock="$LOCK" \
+            -var-file="env/$ENVIRONMENT.tfvars" -out=tfplan
+          {
+            echo "### $ENVIRONMENT"
+            echo '```'
+            terraform show -no-color tfplan
+            echo '```'
+          } >>"$GITHUB_STEP_SUMMARY"
+      - name: apply
+        if: inputs.apply
+        run: terraform apply -input=false -no-color tfplan
