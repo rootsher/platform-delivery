@@ -1,6 +1,7 @@
-# Used twice: by `make up` for the first install, and by the argocd
-# Application afterwards, when ArgoCD takes over managing itself. Keeping one
-# file means the handover does not change anything.
+# Used twice: by `make bootstrap` for the first install, and by the argocd
+# Application afterwards, when ArgoCD takes over managing itself. Both put
+# components.argocd from clusters/<env>/platform.yaml on top, so the handover
+# does not change anything.
 global:
   domain: argocd.localhost
 
