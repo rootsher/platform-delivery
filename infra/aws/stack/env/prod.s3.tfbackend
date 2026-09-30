@@ -2,4 +2,5 @@ bucket       = "rootsher-platform-tfstate-222222222222"
 key          = "prod/terraform.tfstate"
 region       = "eu-central-1"
 encrypt      = true
+kms_key_id   = "arn:aws:kms:eu-central-1:222222222222:alias/platform-tfstate"
 use_lockfile = true
