@@ -20,6 +20,10 @@ concurrency:
 
 jobs:
   promote:
+    # Paused: nothing is deployed while the AWS accounts and the GitHub App do
+    # not exist. Set the repository variable WORKFLOWS_ENABLED to true to run
+    # it again.
+    if: vars.WORKFLOWS_ENABLED == 'true'
     runs-on: ubuntu-24.04
     steps:
       # Pull requests opened with GITHUB_TOKEN do not trigger other workflows,

@@ -28,6 +28,10 @@ concurrency:
 
 jobs:
   staging:
+    # Paused: nothing is deployed while the AWS accounts and the GitHub App do
+    # not exist. Set the repository variable WORKFLOWS_ENABLED to true to run
+    # it again.
+    if: vars.WORKFLOWS_ENABLED == 'true'
     uses: ./.github/workflows/terraform.yml
     permissions:
       contents: read

@@ -22,6 +22,10 @@ env:
 
 jobs:
   check:
+    # Paused: nothing is deployed while the AWS accounts and the GitHub App do
+    # not exist. Set the repository variable WORKFLOWS_ENABLED to true to run
+    # it again.
+    if: vars.WORKFLOWS_ENABLED == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -44,6 +48,10 @@ jobs:
         run: scripts/check-parity.sh
 
   infra:
+    # Paused: nothing is deployed while the AWS accounts and the GitHub App do
+    # not exist. Set the repository variable WORKFLOWS_ENABLED to true to run
+    # it again.
+    if: vars.WORKFLOWS_ENABLED == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
