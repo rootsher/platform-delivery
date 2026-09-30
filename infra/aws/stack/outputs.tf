@@ -22,3 +22,11 @@ output "telemetry_buckets" {
   description = "Buckets for the Loki and Tempo values of the cluster."
   value       = { for k, b in aws_s3_bucket.telemetry : k => b.bucket }
 }
+
+output "terraform_role_arns" {
+  description = "Roles the infra workflow assumes for plans and applies."
+  value = {
+    plan  = module.github_deploy.plan_role_arn
+    apply = module.github_deploy.apply_role_arn
+  }
+}

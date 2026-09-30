@@ -203,3 +203,17 @@ module "telemetry_identity" {
     ]
   })
 }
+
+# The roles the infra workflow plans and applies this stack with. The state
+# bucket and its key come before the stack (scripts/bootstrap-state.sh), so
+# they are referenced by name; the bucket name is the one in
+# env/<environment>.s3.tfbackend.
+module "github_deploy" {
+  source = "../modules/github-deploy"
+
+  name            = "${local.name}-terraform"
+  repository      = "rootsher/platform-delivery"
+  environment     = var.environment
+  state_bucket    = "rootsher-platform-tfstate-${local.account_id}"
+  state_key_alias = "alias/platform-tfstate"
+}
