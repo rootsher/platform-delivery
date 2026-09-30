@@ -1,212 +1,146 @@
 # platform-delivery
 
 The platform side of a delivery flow: everything a service passes through
-between a merged commit and a running pod, with no application code in it.
-The service it delivers lives in
+between a merged commit and a running pod. The service itself lives in
 [platform-sample-backend](https://github.com/rootsher/platform-sample-backend).
 
-**Local is smaller, not looser.** The kind cluster on a laptop runs the same
-GitOps flow, the same database operator and the same policies as the cloud
-environments. It has fewer replicas and less memory. It does not have fewer
-rules.
+**Local is smaller, not looser.** The kind cluster runs the same GitOps flow,
+database operator and policies as the cloud. Fewer replicas, not fewer rules.
 
-## Flow
-
-From a push in the service repo to a request served in a cluster. Dashed
-lines lead to the staging and prod clusters on AWS (ADR 7); locally the same
-flow runs end to end.
-
-```mermaid
-flowchart TB
-  subgraph backend["platform-sample-backend CI"]
-    direction LR
-    push["push to main"] --> checks["lint, type check,<br/>tests on Postgres"]
-    push --> scans["gitleaks, Semgrep"]
-    checks --> build["image build<br/>(distroless, non-root)"]
-    scans --> build
-    build --> sbom["Syft SBOM"] --> grype["Grype scan"]
-    grype --> publish["push to GHCR"]
-    publish --> sign["cosign sign,<br/>SBOM and SLSA attestations"]
-  end
-
-  publish --> ghcr[("GHCR<br/>image by digest")]
-  sign --> rekor[("Rekor<br/>transparency log")]
-
-  subgraph repo["platform-delivery"]
-    direction LR
-    local["environments/local"]
-    staging["environments/staging"]
-    prod["environments/prod"]
-  end
-
-  sign -- "auto merged PR<br/>with the new digest" --> staging
-  staging -- "promote workflow,<br/>reviewed PR" --> prod
-  checks2["ci: render, schemas,<br/>policies, parity"] -.- repo
-
-  subgraph cluster["cluster"]
-    direction LR
-    argocd["ArgoCD<br/>ApplicationSet"] --> admission{"admission:<br/>Pod Security restricted,<br/>Kyverno"}
-    admission --> db["CloudNativePG cluster"] --> migrate["migration job"] --> api["API pods"]
-    api --> gateway["Envoy Gateway"]
-  end
-
-  local --> argocd
-  staging -.-> argocd
-  prod -.-> argocd
-  admission -- "signature and SBOM" --> rekor
-  admission -- "pull by digest" --> ghcr
-  gateway --> client(("client"))
-```
-
-The digest is the only thing that moves between environments. It is written
-once by CI, checked at admission against the signature CI made, and a rollback
-is a revert of the commit that changed it ([ADR 8](docs/adr/0008-rollback-by-digest.md)).
-
-### Inside a cluster
-
-`make up` does the first two steps by hand. Everything after that is ArgoCD
-syncing this repo, in waves, each one waiting for the previous one to be
-healthy.
-
-```mermaid
-flowchart TB
-  kind["kind cluster"] --> install["helm install ArgoCD"] --> root["apply clusters/local/root.yaml"]
-  root --> w3
-
-  subgraph w3["wave -3: cloud clusters only"]
-    sc["gp3 StorageClass"]
-    lbc["AWS Load Balancer Controller"]
-  end
-
-  w3 --> w2
-
-  subgraph w2["wave -2: operators and CRDs"]
-    eg["Envoy Gateway<br/>(Gateway API CRDs)"]
-    kyverno["Kyverno"]
-    eso["external-secrets"]
-    bao["OpenBao (local only)"]
-  end
-
-  w2 --> w1
-
-  subgraph w1["wave -1: platform configuration and services"]
-    gw["GatewayClass, Gateway"]
-    pol["admission policies"]
-    store["ClusterSecretStore"]
-    cnpg["CloudNativePG operator"]
-    obs["Prometheus, Grafana,<br/>Loki, Tempo, collector"]
-  end
-
-  w1 --> w0
-
-  subgraph w0["wave 0: ArgoCD and workloads"]
-    self["ArgoCD manages itself"]
-    appset["workloads ApplicationSet"]
-  end
-
-  appset --> app
-
-  subgraph app["one Application per workload"]
-    direction LR
-    cluster["wave -1<br/>Postgres cluster"] --> job["wave 0<br/>migration job, Service,<br/>HTTPRoute, alerts"] --> deploy["wave 1<br/>Deployment"]
-  end
-```
-
-## Stack
-
-| Layer | Tool | Role |
-| --- | --- | --- |
-| Local cluster | kind, Kubernetes 1.37 | one control plane and two workers, so spreading and failover are real |
-| Packaging | Helm | one chart per workload; environments only supply values |
-| GitOps | ArgoCD with ApplicationSet | app of apps from `clusters/<env>/root.yaml`; ArgoCD also manages itself |
-| Database | CloudNativePG, Postgres 18 | a two instance cluster per workload; the operator writes the credentials Secret |
-| Migrations | a Job from the release image | runs between the database and the new pods, from the same digest |
-| Traffic | Gateway API, Envoy Gateway | the platform owns the Gateway, workloads own their HTTPRoutes |
-| Secrets | external-secrets, OpenBao locally | Kubernetes auth into OpenBao; AWS Secrets Manager through Pod Identity in the cloud |
-| Pod security | Pod Security Admission | restricted level on every workload namespace |
-| Admission policies | Kyverno, CEL policy types | signed images, SBOM attestation, known registries, digests, requests and limits |
-| Supply chain | cosign keyless, Rekor | signatures and attestations made in CI, verified again at admission |
-| Promotion | GitHub Actions, a GitHub App | staging follows main by auto merged PRs; prod by a reviewed PR |
-| Checks | kubeconform, Kyverno CLI, yq | every environment rendered and checked on every PR, plus a parity check |
-| Dependencies | Renovate | charts, pinned images, actions and CI tools; platform changes are always reviewed |
-| Runtime scanning | Grype, nightly | every digest deployed anywhere is rescanned; findings open an issue |
-| Metrics and alerts | kube-prometheus-stack | ServiceMonitor and SLO burn rate rules shipped in the workload chart, tested with promtool |
-| Traces and logs | OpenTelemetry collector, Tempo, Loki | one collector per node for traces and container logs; S3 in the cloud |
-| Dashboards | Grafana | SLO dashboard from git, log to trace links |
-| Cloud | EKS, AWS Secrets Manager, NLB | staging and prod as definitions: gp3 storage, TLS from Secrets Manager, HTTPS only |
-| Infrastructure | Terraform, tflint, trivy | VPC, EKS on Bottlerocket, KMS, Pod Identity roles, Route 53; checked by `terraform test`, tflint and trivy |
-
-### Telemetry
+## Release
 
 ```mermaid
 flowchart LR
-  api["API pods"] -- "OTLP traces" --> otel["OpenTelemetry collector<br/>(one per node)"]
-  pods["container logs<br/>on the node"] -- "filelog" --> otel
-  otel -- traces --> tempo[("Tempo")]
-  otel -- "logs over OTLP" --> loki[("Loki")]
-  prom["Prometheus"] -- "scrapes /metrics" --> api
-  prom -- "SLO burn rate rules" --> am["Alertmanager"]
-  am -- "severity=page" --> pager(("pager"))
-  am -- "severity=ticket" --> tickets(("tickets"))
-  grafana["Grafana"] --> prom
-  grafana --> tempo
-  grafana --> loki
+  ci["service CI<br/>build, scan, sign"] --> ghcr[("GHCR")]
+  ci -- "auto merged PR<br/>with the digest" --> staging["environments/staging"]
+  staging -- "promote workflow,<br/>reviewed PR" --> prod["environments/prod"]
+  staging --> argos["ArgoCD in staging"]
+  prod --> argop["ArgoCD in prod"]
 ```
 
-Every alert carries a link to its runbook in [docs/runbooks](docs/runbooks).
+The image digest is the only thing that moves between environments. A
+rollback is a revert of the commit that changed it
+([ADR 8](docs/adr/0008-rollback-by-digest.md)).
+
+## Cluster bootstrap
+
+```mermaid
+flowchart LR
+  boot["make bootstrap<br/><br/>helm install ArgoCD<br/>apply root.yaml"]
+  boot --> w3["wave -3, cloud only<br/><br/>gp3 StorageClass<br/>AWS LB Controller"]
+  w3 --> w2["wave -2<br/><br/>Envoy Gateway<br/>Kyverno<br/>external-secrets<br/>OpenBao (local)"]
+  w2 --> w1["wave -1<br/><br/>Gateway<br/>policies<br/>secret store<br/>CloudNativePG<br/>observability"]
+  w1 --> w0["wave 0<br/><br/>ArgoCD itself<br/>workloads<br/>ApplicationSet"]
+```
+
+Each wave waits for the previous one to be healthy.
+
+## Workload
+
+```mermaid
+flowchart LR
+  adm(["admission<br/><br/>signed<br/>by digest<br/>limits set"]) --> db["wave -1<br/><br/>Postgres cluster"]
+  db --> job["wave 0<br/><br/>migration Job<br/>Service, HTTPRoute<br/>alerts"]
+  job --> deploy["wave 1<br/><br/>Deployment"]
+```
+
+## Infrastructure
+
+```mermaid
+flowchart LR
+  pr["pull request"] --> checks["fmt, validate<br/>tflint, trivy<br/>terraform test"]
+  pr --> plan["plan staging<br/>and prod"]
+  merge["merge to main"] --> stg["apply staging"] --> ok(["approval"]) --> prd["apply prod"]
+```
+
+GitHub OIDC, no AWS keys in secrets ([ADR 13](docs/adr/0013-applying-terraform.md)).
+
+## Telemetry
+
+```mermaid
+flowchart LR
+  api["API pods"] -- "traces, logs" --> otel["OTel collector"]
+  otel --> tempo[("Tempo")]
+  otel --> loki[("Loki")]
+  prom["Prometheus"] -- scrape --> api
+  prom -- "SLO burn rate" --> am["Alertmanager"]
+  grafana["Grafana"] --> prom & tempo & loki
+```
+
+Every alert links its runbook in [docs/runbooks](docs/runbooks).
+
+## Running it
+
+Locally, with Docker, kind, kubectl, helm, yq and jq, and about 10 GB of memory:
+
+```sh
+make up        # kind cluster, ArgoCD, everything else through GitOps, smoke test
+make password  # ArgoCD admin password
+make down
+```
+
+Then http://notes.localhost:8080/api/notes, http://argocd.localhost:8080 and
+http://grafana.localhost:8080. ArgoCD reads from GitHub, so push before you
+expect a change. While the repo is private: `make up REPO_TOKEN=$(gh auth token)`.
+
+A new cloud environment, with admin credentials for its account:
+
+```sh
+scripts/bootstrap-state.sh staging         # state bucket and key
+terraform -chdir=infra/aws/stack init -backend-config=env/staging.s3.tfbackend
+terraform -chdir=infra/aws/stack apply -var-file=env/staging.tfvars
+# copy the outputs into clusters/staging/platform.yaml, merge
+make bootstrap ENV=staging                 # checks the outputs, installs ArgoCD
+```
+
+After the first apply, Terraform changes go through the `infra` workflow.
+
+## Stack
+
+| Layer | Tool |
+| --- | --- |
+| Local cluster | kind, Kubernetes 1.37, one control plane and two workers |
+| Packaging | Helm, one chart per workload, environments only supply values |
+| GitOps | ArgoCD with ApplicationSet, app of apps from `clusters/<env>/root.yaml` |
+| Database | CloudNativePG, Postgres 18, two instances per workload |
+| Migrations | a Job from the release image, between the database and the pods |
+| Traffic | Gateway API, Envoy Gateway |
+| Secrets | external-secrets; OpenBao locally, AWS Secrets Manager in the cloud |
+| Admission | Pod Security restricted, Kyverno: signatures, SBOM, registries, digests, limits |
+| Supply chain | cosign keyless, Rekor |
+| Promotion | GitHub Actions and a GitHub App |
+| Checks | kubeconform, Kyverno CLI, promtool, parity check |
+| Dependencies | Renovate |
+| Runtime scanning | Grype, nightly, over every deployed digest |
+| Observability | kube-prometheus-stack, Loki, Tempo, OpenTelemetry collector, Grafana |
+| Cloud | EKS on Bottlerocket, NLB, Route 53, KMS, Pod Identity |
+| Infrastructure | Terraform, tflint, trivy, `terraform test`, GitHub OIDC |
 
 ## Layout
 
 ```
 bootstrap/       what has to exist before ArgoCD can manage the rest
-charts/          Helm charts: the workloads, and platform-apps with one cluster's Applications
-clusters/        per cluster: root app, its values, and what differs from others
-environments/    one directory per environment, only values live here
-platform/        manifests shared by every cluster (gateway, policies, dashboards)
-scripts/         the smoke test and the checks CI runs
+charts/          workload charts, and platform-apps with one cluster's Applications
+clusters/        per cluster: root app, its values, what differs from others
+environments/    per environment: workload values only
+platform/        manifests shared by every cluster
 infra/aws/       Terraform: one root module, one variables file per environment
-docs/adr/        decisions and the reasons behind them
-docs/runbooks/   what to do when an alert fires
+scripts/         checks, smoke test, bootstrap helpers
+docs/            decisions and runbooks
 ```
-
-An environment is a directory. Adding one means adding values, not templates.
-
-## Running it locally
-
-Needs Docker, kind, kubectl, helm and jq, and about 10 GB of free memory.
-
-```sh
-make up        # cluster, ArgoCD, then everything else through GitOps
-make password  # admin password for the ArgoCD UI
-make down
-```
-
-`make up` only installs ArgoCD and applies `clusters/local/root.yaml`. From
-there ArgoCD takes over managing itself, installs the operators and syncs the
-workloads from `environments/local`. The last step is a smoke test that writes
-a note through the Gateway and reads it back.
-
-Once it is up, http://notes.localhost:8080/api/notes is the service,
-http://argocd.localhost:8080 is ArgoCD and http://grafana.localhost:8080 is
-Grafana (the admin password is in the `grafana-admin` Secret in `monitoring`).
-
-ArgoCD reads this repo from GitHub, not from the working copy, so local changes
-have to be pushed before the cluster sees them. While the repo is private, pass
-a token that can read it: `make up REPO_TOKEN=$(gh auth token)`.
 
 ## Decisions
 
-The reasoning is in [docs/adr](docs/adr). The short version:
-
-- ArgoCD with a single ApplicationSet, environments as directories.
-- CloudNativePG in every environment, including local.
-- Gateway API for traffic.
-- external-secrets everywhere, with a different store per environment.
-- AWS (VPC, EKS, IAM, Pod Identity, Route 53) in Terraform, with validate,
-  tflint, trivy and `terraform test` on every change.
-- Schema changes are expand then contract, so a rollback is a digest revert.
-- Pod Security Admission at restricted plus Kyverno in Enforce mode in every
-  environment and every namespace outside the platform's own: signed images
-  by digest, known registries, requests and limits.
-- Staging follows main through automatic pull requests; prod gets the digest
-  staging already runs, through a reviewed pull request.
+1. [Record decisions](docs/adr/0001-record-decisions.md)
+2. [Local is smaller, not looser](docs/adr/0002-local-is-smaller-not-looser.md)
+3. [GitOps with ArgoCD and one ApplicationSet](docs/adr/0003-gitops-with-argocd.md)
+4. [CloudNativePG in every environment](docs/adr/0004-cloudnativepg-everywhere.md)
+5. [Gateway API for traffic](docs/adr/0005-gateway-api.md)
+6. [external-secrets in every environment](docs/adr/0006-external-secrets.md)
+7. [AWS in Terraform](docs/adr/0007-aws-in-terraform.md)
+8. [Rollback is a digest revert](docs/adr/0008-rollback-by-digest.md)
+9. [Admission policies](docs/adr/0009-admission-policies.md)
+10. [Promotion by pull request](docs/adr/0010-promotion.md)
+11. [One Terraform root, environments as variables](docs/adr/0011-terraform-layout.md)
+12. [Observability and alerting on SLOs](docs/adr/0012-observability.md)
+13. [Terraform is applied by CI, prod after a review](docs/adr/0013-applying-terraform.md)
