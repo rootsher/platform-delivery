@@ -25,12 +25,19 @@ spec:
             value: /api
       # The weights are the rollout controller's to move; ArgoCD ignores
       # them (see the workloads ApplicationSet), and git keeps the resting
-      # state: everything on stable.
+      # state: everything on stable. group and kind are the API defaults,
+      # spelled out: a sync during a canary writes them into the last applied
+      # configuration, and without them here ArgoCD reads their absence as a
+      # change and reports the route out of sync once the canary is over.
       backendRefs:
-        - name: {{ include "sample-backend.name" . }}-stable
+        - group: ""
+          kind: Service
+          name: {{ include "sample-backend.name" . }}-stable
           port: 80
           weight: 100
-        - name: {{ include "sample-backend.name" . }}-canary
+        - group: ""
+          kind: Service
+          name: {{ include "sample-backend.name" . }}-canary
           port: 80
           weight: 0
 {{- end }}
