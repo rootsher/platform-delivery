@@ -36,12 +36,21 @@ spec:
       destination:
         server: https://kubernetes.default.svc
         namespace: '{{ "{{ .path.basename }}" }}'
+      # During a release the rollout controller moves the weights on the
+      # workload's HTTPRoute. Without this, selfHeal would put them back to
+      # what git says, and the canary would never get its traffic.
+      ignoreDifferences:
+        - group: gateway.networking.k8s.io
+          kind: HTTPRoute
+          jqPathExpressions:
+            - .spec.rules[].backendRefs[].weight
       syncPolicy:
         automated:
           prune: true
           selfHeal: true
         syncOptions:
           - CreateNamespace=true
+          - RespectIgnoreDifferences=true
         managedNamespaceMetadata:
           labels:
             platform.rootsher.dev/tier: workload
