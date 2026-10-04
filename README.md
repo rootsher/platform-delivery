@@ -110,6 +110,14 @@ make bootstrap ENV=staging                 # checks the outputs, installs ArgoCD
 
 After the first apply, Terraform changes go through the `infra` workflow.
 
+Promotion needs a GitHub App with read and write access to contents and pull
+requests, installed on this repository. In this repository and in
+platform-sample-backend, `PROMOTION_APP_ID` is an Actions variable,
+`PROMOTION_APP_KEY` a secret, and `WORKFLOWS_ENABLED=true` a variable that
+switches the workflows on. Here, auto merge is allowed and a ruleset on
+`main` requires the `check` job, which is what the staging pull request
+waits for before it merges.
+
 ## Stack
 
 | Layer | Tool |
