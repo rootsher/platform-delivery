@@ -1,15 +1,12 @@
 # Written by the promotion workflow in platform-sample-backend after every
 # green build on main. Do not edit by hand.
 image:
-  digest: sha256:856462fff1236f2073d1cacbd4f79f260471af51de5704b985551203de69d6f6
-
+  digest: sha256:e331c837958be686006acfc0beea89015ffb95546345a597e6d4997077adcfd2
 replicas: 2
-
 database:
   instances: 2
   storage: 10Gi
   storageClass: gp3
-
 route:
   enabled: true
   gateway:
