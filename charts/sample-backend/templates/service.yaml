@@ -1,14 +1,23 @@
+{{- /*
+Two Services over the same pods. During a release the rollout controller pins
+each to one pod template, stable to the current release and canary to the new
+one, and the HTTPRoute splits traffic between them. Between releases both
+point at the stable pods.
+*/ -}}
+{{- range list "stable" "canary" }}
+---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "sample-backend.name" . }}
+  name: {{ include "sample-backend.name" $ }}-{{ . }}
   labels:
-    {{- include "sample-backend.labels" . | nindent 4 }}
+    {{- include "sample-backend.labels" $ | nindent 4 }}
 spec:
   selector:
-    {{- include "sample-backend.selector" . | nindent 4 }}
+    {{- include "sample-backend.selector" $ | nindent 4 }}
     app.kubernetes.io/component: api
   ports:
     - name: http
       port: 80
       targetPort: http
+{{- end }}

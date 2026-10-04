@@ -23,7 +23,14 @@ spec:
         - path:
             type: PathPrefix
             value: /api
+      # The weights are the rollout controller's to move; ArgoCD ignores
+      # them (see the workloads ApplicationSet), and git keeps the resting
+      # state: everything on stable.
       backendRefs:
-        - name: {{ include "sample-backend.name" . }}
+        - name: {{ include "sample-backend.name" . }}-stable
           port: 80
+          weight: 100
+        - name: {{ include "sample-backend.name" . }}-canary
+          port: 80
+          weight: 0
 {{- end }}

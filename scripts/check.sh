@@ -50,8 +50,17 @@ namespaceSelector:
     labels:
       platform.rootsher.dev/tier: workload
 VALUES
+    # Kyverno turns pod policies into rules for Deployments and the like, but
+    # does not know Rollouts. The pod a Rollout will create is checked as a
+    # Pod instead, so the release pods are not let through unchecked here.
+    yq 'select(.kind == "Rollout") | {
+        "apiVersion": "v1", "kind": "Pod",
+        "metadata": {"name": .metadata.name, "namespace": .metadata.namespace, "labels": .spec.template.metadata.labels},
+        "spec": .spec.template.spec}' "$rendered" >"$out/$env-$workload-pods.yaml"
+
     # verify-images needs the registry and Rekor, so it is left to admission.
     kyverno apply platform/policies/workload-images.yaml platform/policies/workload-resources.yaml \
-      --resource "$rendered" --values-file "$out/values.yaml" --table
+      --resource "$rendered" --resource "$out/$env-$workload-pods.yaml" \
+      --values-file "$out/values.yaml" --table
   done
 done

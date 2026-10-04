@@ -1,0 +1,33 @@
+{{- /*
+The canary passes while its share of 5xx stays within the availability error
+budget, the same number the SLO alerts burn against. Probes are left out, as
+in the SLO rules. No requests at all yields no result, which counts as a
+pass: there is nothing to judge, and the SLO alerts still watch the release
+once it is out. The same goes for a canary that got no requests in the last
+minute, which the > 0 keeps from turning into 0/0.
+*/ -}}
+{{- $name := include "sample-backend.name" . -}}
+{{- $sel := printf "namespace=%q, job=%q, rollouts_pod_template_hash=\"{{ args.canary-hash }}\", route!~\"/healthz|/readyz\"" .Release.Namespace $name -}}
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: {{ $name }}-error-rate
+  labels:
+    {{- include "sample-backend.labels" . | nindent 4 }}
+spec:
+  args:
+    - name: canary-hash
+  metrics:
+    - name: error-rate
+      # Two scrapes have to land before a rate means anything.
+      initialDelay: 1m
+      interval: 30s
+      failureLimit: 1
+      successCondition: len(result) == 0 || result[0] <= {{ subf 1 .Values.slo.availability }}
+      provider:
+        prometheus:
+          address: {{ .Values.canary.prometheus }}
+          query: |
+            (sum(rate(http_request_duration_seconds_count{ {{- $sel }}, status_code=~"5.."}[1m])) or vector(0))
+            /
+            (sum(rate(http_request_duration_seconds_count{ {{- $sel }}}[1m])) > 0)

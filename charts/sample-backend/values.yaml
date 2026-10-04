@@ -30,6 +30,16 @@ slo:
   latency: 0.95
   latencyThreshold: "0.25"
 
+# Release steps: each weight is the canary's share of the route, held for
+# pause while the analysis runs. The same everywhere; a release that is safe
+# to rush locally is not tested the way prod runs it.
+canary:
+  weights: [10, 50]
+  pause: 2m
+  prometheus: http://kube-prometheus-stack-prometheus.monitoring.svc:9090
+# For release drills only, see docs/runbooks/release-drill.md: the share of
+# /api requests the backend fails on purpose. Not an environment setting.
+faultErrorRate: 0
 # Seconds the pod keeps serving after it is marked for deletion, so that
 # endpoints and load balancers stop sending traffic before SIGTERM arrives.
 drainDelaySeconds: 5

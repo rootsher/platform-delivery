@@ -1,5 +1,12 @@
+{{- /*
+Scrapes pods rather than a Service: the stable and canary Services overlap
+between releases and would count every pod twice. The pod template hash comes
+along as a label, which is how the canary analysis tells the new release from
+the old one. job is the release name, as it was for the ServiceMonitor and as
+the SLO rules expect.
+*/ -}}
 apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
+kind: PodMonitor
 metadata:
   name: {{ include "sample-backend.name" . }}
   labels:
@@ -8,7 +15,11 @@ spec:
   selector:
     matchLabels:
       {{- include "sample-backend.selector" . | nindent 6 }}
-  endpoints:
+      app.kubernetes.io/component: api
+  jobLabel: app.kubernetes.io/instance
+  podTargetLabels:
+    - rollouts-pod-template-hash
+  podMetricsEndpoints:
     - port: http
       path: /metrics
       interval: 30s

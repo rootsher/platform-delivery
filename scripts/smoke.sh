@@ -6,7 +6,9 @@ set -euo pipefail
 context=${1:-kind-platform}
 base=${BASE_URL:-http://notes.localhost:8080}
 
-kubectl --context "$context" -n sample-backend rollout status deploy/sample-backend --timeout=5m
+# Healthy means fully promoted: no canary step or analysis still running.
+kubectl --context "$context" -n sample-backend wait rollout/sample-backend --timeout=5m \
+  --for=jsonpath='{.status.phase}'=Healthy
 
 # The route can lag behind the rollout while Envoy picks up the new endpoints.
 for _ in $(seq 60); do

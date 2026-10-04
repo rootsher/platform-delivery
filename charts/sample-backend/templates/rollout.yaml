@@ -1,7 +1,15 @@
-apiVersion: apps/v1
-kind: Deployment
+{{- /*
+A Deployment that releases in steps. A new pod template, which is what a new
+digest is, first gets a tenth of the traffic and then half, while the
+analysis below compares the canary's 5xx rate with the error budget. If it
+fails, the controller sends everything back to the stable pods and scales
+the canary down; the revert in git stays a human decision (ADR 14).
+*/ -}}
+{{- $name := include "sample-backend.name" . -}}
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
 metadata:
-  name: {{ include "sample-backend.name" . }}
+  name: {{ $name }}
   labels:
     {{- include "sample-backend.labels" . | nindent 4 }}
   annotations:
@@ -9,10 +17,32 @@ metadata:
 spec:
   replicas: {{ .Values.replicas }}
   revisionHistoryLimit: 3
+  # A canary that never gets ready is a failed release too.
+  progressDeadlineSeconds: 600
+  progressDeadlineAbort: true
   strategy:
-    rollingUpdate:
-      maxUnavailable: 0
-      maxSurge: 1
+    canary:
+      stableService: {{ $name }}-stable
+      canaryService: {{ $name }}-canary
+      trafficRouting:
+        plugins:
+          argoproj-labs/gatewayAPI:
+            httpRoute: {{ $name }}
+            namespace: {{ .Release.Namespace }}
+      analysis:
+        templates:
+          - templateName: {{ $name }}-error-rate
+        startingStep: 1
+        args:
+          - name: canary-hash
+            valueFrom:
+              podTemplateHashValue: Latest
+      steps:
+        {{- range .Values.canary.weights }}
+        - setWeight: {{ . }}
+        - pause:
+            duration: {{ $.Values.canary.pause }}
+        {{- end }}
   selector:
     matchLabels:
       {{- include "sample-backend.selector" . | nindent 6 }}
@@ -44,6 +74,10 @@ spec:
           env:
             - name: LOG_LEVEL
               value: {{ .Values.logLevel | quote }}
+            {{- with .Values.faultErrorRate }}
+            - name: FAULT_ERROR_RATE
+              value: {{ . | quote }}
+            {{- end }}
             - name: OTEL_SERVICE_NAME
               value: {{ .Chart.Name }}
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
