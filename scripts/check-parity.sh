@@ -5,10 +5,14 @@
 set -euo pipefail
 
 allowed='^(image\.digest|replicas|resources\..*|logLevel|database\.(instances|storage|storageClass|resources\..*)|route\..*)$'
+# A release drill breaks the local release on purpose, through git like any
+# other release (docs/runbooks/release-drill.md). Nowhere else.
+drill='^faultErrorRate$'
 
 status=0
 for values in environments/*/*/values.yaml; do
   while read -r key; do
+    if [[ $values == environments/local/* && $key =~ $drill ]]; then continue; fi
     if [[ ! $key =~ $allowed ]]; then
       echo "$values: $key is not an allowed per environment difference" >&2
       status=1
