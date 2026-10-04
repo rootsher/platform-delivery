@@ -54,12 +54,20 @@ endif
 
 # Installed with the same values the argocd Application uses later, including
 # this cluster's, so the handover to ArgoCD changes nothing.
+#
+# The namespace is created here with its platform label. The Gateway only
+# takes routes from labelled namespaces, and once Kyverno runs, a namespace
+# cannot gain that label after the fact; waiting for the argocd Application to
+# set it would leave the gateway app degraded and the sync stuck before it.
 argocd:
+	$(KUBECTL) create namespace argocd --dry-run=client -o yaml \
+	| $(KUBECTL) label --local -f - platform.rootsher.dev/tier=platform -o yaml \
+	| $(KUBECTL) apply -f -
 	yq '.components.argocd // {}' clusters/$(ENV)/platform.yaml | \
 	helm upgrade --install argocd argo-cd \
 		--kube-context $(CONTEXT) \
 		--repo https://argoproj.github.io/argo-helm --version $(ARGOCD_CHART) \
-		--namespace argocd --create-namespace \
+		--namespace argocd \
 		--values bootstrap/argocd/values.yaml --values - \
 		--wait --timeout 10m
 
