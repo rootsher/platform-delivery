@@ -1,0 +1,49 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argo-rollouts
+  namespace: argocd
+  annotations:
+    # Operators before workloads, so their CRDs exist when the workloads sync.
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  project: default
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argo-rollouts
+    targetRevision: 2.43.5
+    helm:
+      releaseName: argo-rollouts
+      {{- /*
+      The Gateway API plugin is what moves the weights on a workload's
+      HTTPRoute. The controller downloads it at start, so it is pinned by
+      checksum like an image by digest. Of the provider RBAC the chart ships,
+      only Gateway API is used here.
+      */}}
+      {{- $plugin := dict
+        "name" "argoproj-labs/gatewayAPI"
+        "location" "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/v0.17.0/gatewayapi-plugin-linux-amd64"
+        "sha256" "1904ca787d33107c140521899d61fff030ee75d99908bd175fca5a4647759061" }}
+      {{- $providers := dict
+        "istio" false "smi" false "ambassador" false "awsLoadBalancerController" false
+        "awsAppMesh" false "traefik" false "apisix" false "contour" false
+        "glooPlatform" false "gatewayAPI" true }}
+      {{- $defaults := dict
+        "controller" (dict "trafficRouterPlugins" (list $plugin))
+        "providerRBAC" (dict "providers" $providers) }}
+      valuesObject:
+        {{- mergeOverwrite $defaults .Values.components.argoRollouts | toYaml | nindent 8 }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argo-rollouts
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    # Exempts it from the workload policies; see platform-namespaces.
+    managedNamespaceMetadata:
+      labels:
+        platform.rootsher.dev/tier: platform
