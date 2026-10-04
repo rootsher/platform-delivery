@@ -22,6 +22,21 @@ The image digest is the only thing that moves between environments. A
 rollback is a revert of the commit that changed it
 ([ADR 8](docs/adr/0008-rollback-by-digest.md)).
 
+In the cluster a new digest is released as a canary
+([ADR 14](docs/adr/0014-canary-releases.md)):
+
+```mermaid
+flowchart LR
+  sync["ArgoCD syncs<br/>the new digest"] --> c10["canary<br/>10% of the route"]
+  c10 --> c50["canary<br/>50%"] --> full(["100%,<br/>old pods gone"])
+  an["analysis: canary 5xx<br/>within the error budget?"] -. "no" .-> abort(["abort: all traffic<br/>back to stable"])
+  c10 & c50 --- an
+  abort --> revert["revert the digest<br/>in git, by hand"]
+```
+
+[Release drill](docs/runbooks/release-drill.md) shows a bad release being
+stopped on the local cluster.
+
 ## Cluster bootstrap
 
 ```mermaid
@@ -41,7 +56,7 @@ Each wave waits for the previous one to be healthy.
 flowchart LR
   adm(["admission<br/><br/>signed<br/>by digest<br/>limits set"]) --> db["wave -1<br/><br/>Postgres cluster"]
   db --> job["wave 0<br/><br/>migration Job<br/>Service, HTTPRoute<br/>alerts"]
-  job --> deploy["wave 1<br/><br/>Deployment"]
+  job --> deploy["wave 1<br/><br/>Rollout"]
 ```
 
 ## Infrastructure
@@ -102,6 +117,7 @@ After the first apply, Terraform changes go through the `infra` workflow.
 | Local cluster | kind, Kubernetes 1.37, one control plane and two workers |
 | Packaging | Helm, one chart per workload, environments only supply values |
 | GitOps | ArgoCD with ApplicationSet, app of apps from `clusters/<env>/root.yaml` |
+| Releases | Argo Rollouts, canary on the HTTPRoute, analysis on Prometheus |
 | Database | CloudNativePG, Postgres 18, two instances per workload |
 | Migrations | a Job from the release image, between the database and the pods |
 | Traffic | Gateway API, Envoy Gateway |
@@ -144,3 +160,4 @@ docs/            decisions and runbooks
 11. [One Terraform root, environments as variables](docs/adr/0011-terraform-layout.md)
 12. [Observability and alerting on SLOs](docs/adr/0012-observability.md)
 13. [Terraform is applied by CI, prod after a review](docs/adr/0013-applying-terraform.md)
+14. [Canary releases with Argo Rollouts](docs/adr/0014-canary-releases.md)

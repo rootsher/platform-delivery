@@ -1,5 +1,5 @@
 {{- /*
-Runs from the same digest as the Deployment, so the schema and the code that
+Runs from the same digest as the Rollout, so the schema and the code that
 needs it can never come from different builds. It is a Sync hook in wave 0:
 after the database (wave -1), before the new pods (wave 1). Migrations are
 expand then contract, so the pods of the previous release keep working while
